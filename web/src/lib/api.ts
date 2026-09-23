@@ -12,7 +12,7 @@ import { NetworkError, setTransport } from './offline/sync';
 export { ApiError };
 
 let accessToken: string | null = null;
-let onExpired: (() => void) | null = null;
+let onExpired: ((reason?: string) => void) | null = null;
 let refreshing: Promise<any | null> | null = null;
 /** El último intento de renovar la sesión falló por falta de conexión (no porque la sesión haya caducado). */
 let refreshOffline = false;
@@ -27,7 +27,7 @@ export const setOnSessionRestored = (fn: (s: any) => void) => { onRestored = fn;
 
 export const setAccessToken = (t: string | null) => { accessToken = t; };
 export const getAccessToken = () => accessToken;
-export const setOnSessionExpired = (fn: () => void) => { onExpired = fn; };
+export const setOnSessionExpired = (fn: (reason?: string) => void) => { onExpired = fn; };
 
 const GET_TIMEOUT_MS = 20_000;
 
@@ -83,7 +83,9 @@ async function send(method: string, path: string, body?: unknown, opts: { signal
   let res = await once();
   if (res.status === 401 && !path.startsWith('/auth/login') && !path.startsWith('/auth/refresh')) {
     const data = await parse(res.clone());
-    if (data?.error?.code === 'company_not_selected') return { res, data };
+    // No tiene sentido reintentar renovar: ambos casos ya están resueltos (falta elegir empresa, o esta sesión
+    // se cerró porque el usuario entró en otro dispositivo — la cookie de renovación quedó revocada también).
+    if (data?.error?.code === 'company_not_selected' || data?.error?.code === 'session_revoked') return { res, data };
     const s = await refreshSession();
     if (s) res = await once();
     else if (refreshOffline) throw new NetworkError();
@@ -135,7 +137,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   if (!(await ensureSession())) return fromCache(p);
   try {
     const { res, data } = await send('GET', p, undefined, { signal, timeout: GET_TIMEOUT_MS });
-    if (res.status === 401 && data?.error?.code === 'no_session') { onExpired?.(); throw new ApiError(401, 'no_session'); }
+    if (res.status === 401 && (data?.error?.code === 'no_session' || data?.error?.code === 'session_revoked')) { onExpired?.(data.error.code); throw new ApiError(401, data.error.code); }
     if (!res.ok) throw fail(res, data);
     if (isCacheable(p)) cachePut(p, data);
     return (await overlayGet(p, data)) as T;
@@ -152,7 +154,7 @@ async function readPost<T>(path: string, body: unknown, usable: boolean): Promis
   if (usable && !mustQueue(path, body, true)) {
     try {
       const { res, data } = await send('POST', path, body ?? {});
-      if (res.status === 401 && data?.error?.code === 'no_session') { onExpired?.(); throw new ApiError(401, 'no_session'); }
+      if (res.status === 401 && (data?.error?.code === 'no_session' || data?.error?.code === 'session_revoked')) { onExpired?.(data.error.code); throw new ApiError(401, data.error.code); }
       if (!res.ok) throw fail(res, data);
       return data as T;
     } catch (e) {
@@ -178,7 +180,7 @@ async function mutate<T>(method: Method, path: string, body: unknown): Promise<T
   const key = kind ? (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`) : undefined;
   try {
     const { res, data } = await send(method, path, body ?? {}, { headers: key ? { 'Idempotency-Key': key } : undefined });
-    if (res.status === 401 && data?.error?.code === 'no_session') { onExpired?.(); throw new ApiError(401, 'no_session'); }
+    if (res.status === 401 && (data?.error?.code === 'no_session' || data?.error?.code === 'session_revoked')) { onExpired?.(data.error.code); throw new ApiError(401, data.error.code); }
     if (!res.ok) throw fail(res, data);
     notifyChanged(path);
     return data as T;
@@ -207,7 +209,7 @@ async function call<T>(method: string, path: string, body?: unknown, signal?: Ab
 async function plain<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   try {
     const { res, data } = await send(method, path, body, { signal });
-    if (res.status === 401 && data?.error?.code === 'no_session') { onExpired?.(); throw new ApiError(401, 'no_session'); }
+    if (res.status === 401 && (data?.error?.code === 'no_session' || data?.error?.code === 'session_revoked')) { onExpired?.(data.error.code); throw new ApiError(401, data.error.code); }
     if (!res.ok) throw fail(res, data);
     return data as T;
   } catch (e) {

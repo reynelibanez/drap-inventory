@@ -13,6 +13,8 @@ export const DEFAULT_SETTINGS = {
   assetCodeFormat: 'A-{nnnn}',
   /** Días que dura una reserva antes de liberarse sola (null = no vence). */
   reservationDays: null as number | null,
+  /** Minutos sin usar el sistema antes de bloquear la pantalla (hay que ingresar la contraseña de nuevo). null = desactivado. */
+  inactivityLockMinutes: null as number | null,
   /** Al terminar el testeo, el equipo se ubica solo en el espacio que le corresponde según las reglas. */
   autoPlaceOnTest: true,
   /** Pesos de la ubicación inteligente (mayor = más importante). */
@@ -36,6 +38,7 @@ export const settingsPatchSchema = z.object({
   orderCodeFormat: z.string().min(3).max(60).refine((s) => /\{n+\}/.test(s), 'code_needs_counter').optional(),
   assetCodeFormat: z.string().min(3).max(60).refine((s) => /\{n+\}/.test(s), 'code_needs_counter').optional(),
   reservationDays: z.number().int().min(1).max(365).nullable().optional(),
+  inactivityLockMinutes: z.number().int().min(1).max(480).nullable().optional(),
   autoPlaceOnTest: z.boolean().optional(),
   placement: z.object({
     sameModel: z.number().min(0).max(1000),

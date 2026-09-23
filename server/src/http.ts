@@ -4,8 +4,9 @@ import { Db, withGlobal, withTenant } from './db.js';
 import { badRequest, conflict, forbidden, paymentRequired, unauthorized } from './errors.js';
 import { isBillingBlocked } from './services/billing.js';
 
-/** Contenido del token de acceso. */
-export interface TokenPayload { sub: number; cid: number | null }
+/** Contenido del token de acceso. `sid` identifica la sesión (fila de refresh_tokens); los tokens emitidos
+ *  antes de que existiera este campo no lo tienen y se dejan pasar igual hasta que se renueven. */
+export interface TokenPayload { sub: number; cid: number | null; sid?: number }
 
 declare module '@fastify/jwt' {
   interface FastifyJWT { payload: TokenPayload; user: TokenPayload }
@@ -43,6 +44,34 @@ const CACHE_MS = 5_000;
 
 /** Llamar tras cambiar roles/permisos/membresías/suscripción para que apliquen de inmediato. */
 export function invalidateAccessCache() { accessCache.clear(); }
+
+// ---- validez de la sesión (un solo dispositivo a la vez), con caché corta ----
+
+const sessionCache = new Map<number, { valid: boolean; expires: number }>();
+const SESSION_CACHE_MS = 5_000;
+
+/** Llamar al cerrar una sesión (login en otro dispositivo, logout) para que el corte sea inmediato. */
+export function invalidateSessionCache(sid?: number) {
+  if (sid == null) sessionCache.clear(); else sessionCache.delete(sid);
+}
+
+/**
+ * Solo puede haber una sesión abierta por usuario: al iniciar sesión en otro dispositivo, las demás se revocan
+ * (ver /api/auth/login). Si el token de esta petición pertenece a una sesión ya revocada, se corta acá.
+ * `sid` puede faltar en tokens emitidos antes de este cambio: se dejan pasar hasta que se renueven solos.
+ */
+async function assertSessionValid(sid: number | undefined): Promise<void> {
+  if (sid == null) return;
+  const hit = sessionCache.get(sid);
+  if (hit && hit.expires > Date.now()) {
+    if (!hit.valid) throw unauthorized('session_revoked');
+    return;
+  }
+  const row = await withGlobal((db) => db.opt('SELECT 1 FROM refresh_tokens WHERE id = $1 AND revoked_at IS NULL', [sid]));
+  const valid = !!row;
+  sessionCache.set(sid, { valid, expires: Date.now() + SESSION_CACHE_MS });
+  if (!valid) throw unauthorized('session_revoked');
+}
 
 async function loadAccess(db: Db, companyId: number, userId: number): Promise<Access> {
   const key = `${companyId}:${userId}`;
@@ -120,6 +149,7 @@ export function route<T>(permission: string | string[] | null, fn: (c: Ctx) => P
     } catch {
       throw unauthorized();
     }
+    await assertSessionValid(payload.sid);
     if (!payload.cid) throw unauthorized('company_not_selected');
     const companyId = payload.cid;
 
@@ -200,6 +230,7 @@ export function userRoute<T>(fn: (c: GlobalCtx) => Promise<T>, opts: { platformA
   return async function (req, reply) {
     try { await req.jwtVerify(); } catch { throw unauthorized(); }
     const payload = req.user;
+    await assertSessionValid(payload.sid);
     return withGlobal(async (db) => {
       const u = await db.opt<{ is_active: boolean; is_platform_admin: boolean }>('SELECT is_active, is_platform_admin FROM users WHERE id = $1', [payload.sub]);
       if (!u || !u.is_active) throw unauthorized();

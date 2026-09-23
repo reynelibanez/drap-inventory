@@ -43,7 +43,13 @@
     "auto_place": "Place automatically when testing finishes",
     "auto_place_hint": "When a unit finishes testing, the system puts it in the slot that fits the rules of each rack level. If there is no room it stays unplaced and you are warned.",
     "asset_format": "Asset format",
-    "asset_format_hint": "own tools and equipment; does not restart every month"
+    "asset_format_hint": "own tools and equipment; does not restart every month",
+    "security": "Security",
+    "inactivity_lock": "Inactivity lock",
+    "inactivity_lock_hint": "If no one uses the system for this long, the screen locks and the password must be entered again to continue (nothing you were doing is lost).",
+    "inactivity_lock_never": "Never (off)",
+    "inactivity_lock_minutes_one": "{{count}} minute",
+    "inactivity_lock_minutes_other": "{{count}} minutes"
   },
   "platform": {
     "title": "Platform: companies",

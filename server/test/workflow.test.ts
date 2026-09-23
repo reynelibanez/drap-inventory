@@ -435,16 +435,24 @@ describe('aislamiento entre empresas', () => {
     expect(add.status).toBe(200);
     expect(add.body.createdUser).toBe(false);
 
+    // Un solo dispositivo a la vez: para tener las dos empresas activas al mismo tiempo (dos pestañas del
+    // mismo usuario) hay que cambiar de empresa dentro de la misma sesión (select-company), no volver a
+    // iniciar sesión — un login nuevo cerraría la sesión anterior en el otro dispositivo/pestaña.
     const s = await login(api, 'adminA');
     expect(s.session.companies).toHaveLength(2);
     expect(s.session.activeCompanyId).toBeNull();
-    const inA = await login(api, 'adminA', 'password123', A.id);
-    const inB = await login(api, 'adminA', 'password123', B.id);
+    const selA = await api.call('POST', '/api/auth/select-company', s.token, { companyId: A.id });
+    const selB = await api.call('POST', '/api/auth/select-company', s.token, { companyId: B.id });
+    const inA = { token: selA.body.accessToken as string };
+    const inB = { token: selB.body.accessToken as string };
     expect((await api.call('POST', '/api/lots', inA.token, { lines: [] })).status).toBe(200);
     expect((await api.call('POST', '/api/lots', inB.token, { lines: [] })).status).toBe(403);
     // Cada empresa tiene su número de técnico
     const meB = await api.call('GET', '/api/team/members', tokB);
     expect(meB.body.items.map((x: any) => x.techNumber).sort()).toEqual([1, 2]);
+    // El login de arriba (sin empresa) cerró la sesión original de adminA (un solo dispositivo a la vez):
+    // el resto del archivo sigue usando `tokA`, así que lo actualizamos al token vigente de esa misma sesión.
+    tokA = inA.token;
   });
 
   it('una empresa no puede tomar la cuenta de un usuario compartido', async () => {

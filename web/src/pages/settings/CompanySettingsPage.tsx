@@ -8,7 +8,9 @@ import { useReloadMeta } from '../../lib/meta';
 import { Button, Card, Checkbox, Field, Input, PageHeader, Select, Spinner, useErr, useToast } from '../../components/ui';
 
 interface Placement { sameModel: number; sameBrand: number; sameType: number; sameGrade: number; preferredArea: number; emptySlot: number; fillStarted: number }
-interface Settings { unitCodeFormat: string; lotCodeFormat: string; orderCodeFormat: string; assetCodeFormat: string; reservationDays: number | null; autoPlaceOnTest: boolean; placement: Placement }
+interface Settings { unitCodeFormat: string; lotCodeFormat: string; orderCodeFormat: string; assetCodeFormat: string; reservationDays: number | null; inactivityLockMinutes: number | null; autoPlaceOnTest: boolean; placement: Placement }
+
+const LOCK_OPTIONS = [5, 15, 30, 60];
 interface CompanyData { company: { id: number; name: string; legalName: string | null; taxId: string | null; defaultLanguage: 'es' | 'en'; currency: string; timezone: string }; settings: Settings; defaults: Settings }
 
 /** Vista previa de una plantilla de código (misma lógica que el servidor). */
@@ -55,7 +57,7 @@ export default function CompanySettingsPage() {
     try {
       await api.patch('/company', {
         name: c!.name.trim(), legalName: c!.legalName?.trim() || null, taxId: c!.taxId?.trim() || null, defaultLanguage: c!.defaultLanguage, currency: c!.currency.trim().toUpperCase(), timezone: c!.timezone,
-        settings: { unitCodeFormat: s!.unitCodeFormat, lotCodeFormat: s!.lotCodeFormat, orderCodeFormat: s!.orderCodeFormat, assetCodeFormat: s!.assetCodeFormat, reservationDays: days.trim() ? Math.floor(Number(days)) : null, autoPlaceOnTest: s!.autoPlaceOnTest, placement: s!.placement },
+        settings: { unitCodeFormat: s!.unitCodeFormat, lotCodeFormat: s!.lotCodeFormat, orderCodeFormat: s!.orderCodeFormat, assetCodeFormat: s!.assetCodeFormat, reservationDays: days.trim() ? Math.floor(Number(days)) : null, inactivityLockMinutes: s!.inactivityLockMinutes, autoPlaceOnTest: s!.autoPlaceOnTest, placement: s!.placement },
       });
       toast.success(t('common.saved'));
       void qc.invalidateQueries({ queryKey: ['company'] }); await reloadMeta(); await reload();
@@ -105,6 +107,19 @@ export default function CompanySettingsPage() {
         <Card title={t('company.sales')}>
           <Field label={t('company.reservation_days')} hint={t('company.reservation_days_hint')}>
             <Input type="number" min={1} max={365} value={days} onChange={(e) => setDays(e.target.value)} style={{ width: 140 }} placeholder={t('company.no_expiry')} />
+          </Field>
+        </Card>
+
+        <Card title={t('company.security')}>
+          <Field label={t('company.inactivity_lock')} hint={t('company.inactivity_lock_hint')}>
+            <Select
+              value={s.inactivityLockMinutes ?? ''}
+              onChange={(e) => setS({ ...s, inactivityLockMinutes: e.target.value ? Number(e.target.value) : null })}
+              style={{ width: 220 }}
+            >
+              <option value="">{t('company.inactivity_lock_never')}</option>
+              {LOCK_OPTIONS.map((m) => <option key={m} value={m}>{t('company.inactivity_lock_minutes', { count: m })}</option>)}
+            </Select>
           </Field>
         </Card>
 

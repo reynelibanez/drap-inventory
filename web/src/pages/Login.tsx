@@ -13,7 +13,7 @@ const readUser = () => { try { return localStorage.getItem(USER_KEY) ?? ''; } ca
 const saveUser = (v: string | null) => { try { if (v) localStorage.setItem(USER_KEY, v); else localStorage.removeItem(USER_KEY); } catch { /* sin almacenamiento */ } };
 
 /** Marco de las pantallas de acceso: fondo azul noche con patrón de circuito y tarjeta de cristal con el escudo de DRAP. */
-function AuthFrame({ title, hint, children }: { title?: ReactNode; hint?: ReactNode; children: ReactNode }) {
+export function AuthFrame({ title, hint, children }: { title?: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const { t } = useTranslation();
   return (
     <div className="auth-page">
@@ -38,7 +38,7 @@ function AuthFrame({ title, hint, children }: { title?: ReactNode; hint?: ReactN
 
 export function LoginPage() {
   const { t } = useTranslation();
-  const { login } = useAuth();
+  const { login, sessionEndReason, clearSessionEndReason } = useAuth();
   const err = useErr();
   const saved = readUser();
   const [username, setUsername] = useState(saved);
@@ -60,6 +60,12 @@ export function LoginPage() {
   }
   return (
     <AuthFrame>
+      {sessionEndReason === 'revoked' && (
+        <div className="auth-note" role="note">
+          <span>{t('errors.session_revoked')}</span>
+          <button type="button" className="auth-link" onClick={clearSessionEndReason}>{t('common.close')}</button>
+        </div>
+      )}
       <form className="auth-form" onSubmit={submit}>
         {error && <div className="auth-error" role="alert">{error}</div>}
         <label className="auth-field">

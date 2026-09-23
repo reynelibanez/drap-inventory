@@ -43,7 +43,13 @@
     "auto_place": "Ubicar automáticamente al terminar el testeo",
     "auto_place_hint": "Cuando un equipo termina de testearse, el sistema le asigna solo el espacio que le corresponde según las reglas de cada nivel. Si no hay espacio, queda sin ubicar y se avisa.",
     "asset_format": "Formato del activo",
-    "asset_format_hint": "herramientas y equipos propios; no reinicia cada mes"
+    "asset_format_hint": "herramientas y equipos propios; no reinicia cada mes",
+    "security": "Seguridad",
+    "inactivity_lock": "Bloqueo por inactividad",
+    "inactivity_lock_hint": "Si nadie usa el sistema durante este tiempo, la pantalla se bloquea y hay que ingresar la contraseña de nuevo para seguir (no se pierde lo que estabas haciendo).",
+    "inactivity_lock_never": "Nunca (desactivado)",
+    "inactivity_lock_minutes_one": "{{count}} minuto",
+    "inactivity_lock_minutes_other": "{{count}} minutos"
   },
   "platform": {
     "title": "Plataforma: empresas",

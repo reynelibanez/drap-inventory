@@ -21,7 +21,7 @@ export interface BillingInfo {
   billingInterval: 'monthly' | 'annual' | null; trialEndsAt: string | null; currentPeriodEnd: string | null;
   canceledAt: string | null; hasStripeCustomer: boolean; blocked: boolean;
 }
-export interface AccessInfo { isCompanyAdmin: boolean; permissions: string[]; roles: { id: number; name: string }[]; settings: { reservationDays: number | null; unitCodeFormat: string }; billing: BillingInfo | null }
+export interface AccessInfo { isCompanyAdmin: boolean; permissions: string[]; roles: { id: number; name: string }[]; settings: { reservationDays: number | null; unitCodeFormat: string; inactivityLockMinutes: number | null }; billing: BillingInfo | null }
 interface SessionData { accessToken: string; user: UserInfo; companies: CompanyInfo[]; activeCompanyId: number | null; access: AccessInfo | null }
 
 interface AuthState {
@@ -39,9 +39,21 @@ interface AuthState {
   selectCompany: (id: number) => Promise<void>;
   reload: () => Promise<void>;
   setLanguage: (lang: Lang) => Promise<void>;
+  /** Pantalla bloqueada por inactividad (ver settings.inactivityLockMinutes de la empresa). */
+  locked: boolean;
+  /** Confirma la contraseña y desbloquea sin perder la sesión ni la pantalla en la que se estaba. */
+  unlock: (password: string) => Promise<void>;
+  /** Se cerró la sesión porque este usuario inició sesión en otro dispositivo (para avisar una sola vez en Login). */
+  sessionEndReason: 'revoked' | null;
+  clearSessionEndReason: () => void;
 }
 
 const Ctx = createContext<AuthState | null>(null);
+
+/** Última actividad del usuario (para el bloqueo por inactividad), compartida entre pestañas del mismo navegador. */
+const ACTIVITY_KEY = 'drap.lastActivity';
+const readActivity = (): number => { try { return Number(localStorage.getItem(ACTIVITY_KEY)) || Date.now(); } catch { return Date.now(); } };
+const writeActivity = (t: number) => { try { localStorage.setItem(ACTIVITY_KEY, String(t)); } catch { /* sin almacenamiento */ } };
 
 /** Sesión guardada en el teléfono (sin tokens) para poder abrir la app sin conexión. Caduca igual que la sesión del servidor. */
 const SNAPSHOT_DAYS = 14;
@@ -56,6 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
   const [status, setStatus] = useState<AuthState['status']>('loading');
   const [data, setData] = useState<SessionData | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [sessionEndReason, setSessionEndReason] = useState<'revoked' | null>(null);
   const lastCompany = useRef<number | null>(null);
 
   const apply = useCallback((s: SessionData | null, opts: { offline?: boolean } = {}) => {
@@ -64,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOfflineSession(false);
       setData(null);
       setStatus('anon');
+      setLocked(false);
       qc.clear();
       lastCompany.current = null;
       setCacheScope(null);
@@ -71,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void kv.del('session');
       return;
     }
+    setLocked(false);
+    writeActivity(Date.now());
     setAccessToken(opts.offline ? null : s.accessToken);
     setOfflineSession(!!opts.offline);
     // Copia local y bandeja de trabajo sin conexión: una por usuario y empresa.
@@ -112,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [apply]);
 
   useEffect(() => {
-    setOnSessionExpired(() => apply(null));
+    setOnSessionExpired((reason) => { if (reason === 'session_revoked') setSessionEndReason('revoked'); apply(null); });
     setOnSessionRestored((s) => apply(s));
     boot();
   }, [apply, boot]);
@@ -126,6 +143,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener('online', retry);
     return () => window.removeEventListener('online', retry);
   }, [status, boot]);
+
+  // ---- Bloqueo por inactividad (minutos configurados por la empresa; null/0 = desactivado) ----
+  const inactivityMinutes = data?.access?.settings.inactivityLockMinutes ?? null;
+  const rearmLockTimer = useRef<(() => void) | undefined>(undefined);
+  useEffect(() => {
+    if (status !== 'authed' || !inactivityMinutes) { rearmLockTimer.current = undefined; return; }
+    const limitMs = inactivityMinutes * 60_000;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const check = () => {
+      const idleFor = Date.now() - readActivity();
+      if (idleFor >= limitMs) { setLocked(true); return; }
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(check, limitMs - idleFor);
+    };
+    const onActivity = () => {
+      // No se escribe en cada evento: alcanza con una vez cada pocos segundos.
+      if (Date.now() - readActivity() > 5_000) writeActivity(Date.now());
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(check, limitMs);
+    };
+    // Otra pestaña del mismo navegador tuvo actividad: no bloquear esta si la otra sigue en uso.
+    const onStorage = (e: StorageEvent) => { if (e.key === ACTIVITY_KEY) check(); };
+    // El temporizador se pausa si el navegador suspende la pestaña en segundo plano: se revisa igual al volver.
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+
+    const events: (keyof WindowEventMap)[] = ['mousedown', 'keydown', 'touchstart', 'wheel'];
+    events.forEach((ev) => window.addEventListener(ev, onActivity, { passive: true }));
+    window.addEventListener('storage', onStorage);
+    document.addEventListener('visibilitychange', onVisible);
+    // Se llama justo después de desbloquear con éxito: reinicia el conteo desde ahora.
+    rearmLockTimer.current = () => { writeActivity(Date.now()); check(); };
+    check();
+    return () => {
+      if (timer) clearTimeout(timer);
+      events.forEach((ev) => window.removeEventListener(ev, onActivity));
+      window.removeEventListener('storage', onStorage);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [status, inactivityMinutes]);
 
   const login = useCallback(async (username: string, password: string) => {
     const s = await api.post<SessionData>('/auth/login', { username, password });
@@ -151,6 +208,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (s) apply(s);
   }, [apply]);
 
+  const unlock = useCallback(async (password: string) => {
+    await api.post('/auth/unlock', { password });
+    setLocked(false);
+    rearmLockTimer.current?.();
+  }, []);
+
+  const clearSessionEndReason = useCallback(() => setSessionEndReason(null), []);
+
   const setLanguage = useCallback(async (lang: Lang) => {
     applyLanguage(lang);
     if (status === 'authed') {
@@ -169,8 +234,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {
       status, user: data?.user ?? null, companies: data?.companies ?? [], company, access: data?.access ?? null,
       can, canAny: (...ps) => ps.some(can), login, logout, selectCompany, reload, setLanguage, retryConnection,
+      locked, unlock, sessionEndReason, clearSessionEndReason,
     };
-  }, [status, data, login, logout, selectCompany, reload, setLanguage, retryConnection]);
+  }, [status, data, login, logout, selectCompany, reload, setLanguage, retryConnection, locked, unlock, sessionEndReason, clearSessionEndReason]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -155,7 +155,12 @@
     "show_password": "Show password",
     "hide_password": "Hide password",
     "version": "Version {{v}}",
-    "protected": "Protected connection"
+    "protected": "Protected connection",
+    "lock_title": "Locked due to inactivity",
+    "lock_hint": "Enter your password to continue where you left off.",
+    "unlock": "Unlock",
+    "unlock_offline": "An internet connection is needed to unlock.",
+    "session_closed_elsewhere": "We signed you out here because this user signed in on another device."
   },
   "errors": {
     "generic": "An unexpected error occurred. Please try again.",
@@ -300,6 +305,7 @@
     "stripe_session_without_url": "Couldn't start the payment. Try again.",
     "no_stripe_customer": "This company doesn't have a Stripe payment on file yet.",
     "plan_user_limit": "The current plan allows up to {{max}} users. Upgrade to add more.",
-    "plan_location_limit": "The current plan allows up to {{max}} warehouses. Upgrade to add more."
+    "plan_location_limit": "The current plan allows up to {{max}} warehouses. Upgrade to add more.",
+    "session_revoked": "Your session was closed because this user signed in on another device."
   }
 }

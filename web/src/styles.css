@@ -384,7 +384,10 @@ table.table { width: 100%; border-collapse: collapse; }
 .auth-submit:focus-visible, .auth-link:focus-visible, .auth-eye:focus-visible { outline: 2px solid #2ab6e6; outline-offset: 2px; }
 .auth-link { align-self: center; border: 0; background: none; color: #8fd3f0; font: inherit; font-size: 13.5px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
 .auth-link:hover { color: #fff; text-decoration: underline; }
-.auth-error { padding: 10px 14px; border-radius: 10px; background: rgba(220, 38, 38, 0.22); border: 1px solid rgba(255, 140, 140, 0.4); color: #ffd4d4; font-size: 13.5px; }
+.auth-error { padding: 10px 14px; border-radius: 10px; background: rgba(220, 38, 38, 0.22); border: 1px solid rgba(255, 140, 140, 0.4); color: #ffd4d4; font-size: 13.5px; display: flex; align-items: center; gap: 8px; }
+/* Bloqueo por inactividad: se dibuja encima de la pantalla actual (que sigue montada debajo, sin perder su estado) */
+.lock-overlay { position: fixed; inset: 0; z-index: 9999; overflow: auto; }
+.lock-overlay .auth-page { min-height: 100%; }
 .auth-note { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 10px; background: rgba(42, 182, 230, 0.12); border: 1px solid rgba(42, 182, 230, 0.35); color: #d6ebf7; font-size: 13px; line-height: 1.45; }
 .auth-note strong { color: #fff; }
 .auth-foot { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 22px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.12); color: #8fa9c0; font-size: 12px; }

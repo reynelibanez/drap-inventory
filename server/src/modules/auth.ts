@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import { withGlobal, withTenant } from '../db.js';
 import { badRequest, forbidden, unauthorized } from '../errors.js';
 import { hashPassword, hashToken, newOpaqueToken, passwordProblem, verifyPassword } from '../auth/password.js';
-import { userRoute, zId } from '../http.js';
+import { invalidateSessionCache, userRoute, zId } from '../http.js';
 import { getSettings } from '../settings.js';
 import { billingSummary, getCompanyBilling } from '../services/billing.js';
 
@@ -52,15 +52,15 @@ async function effectivePermissions(companyId: number, userId: number) {
     const cb = await getCompanyBilling(db, companyId);
     return {
       isCompanyAdmin: m.is_company_admin, permissions: [...set].sort(), roles,
-      settings: { reservationDays: settings.reservationDays, unitCodeFormat: settings.unitCodeFormat },
+      settings: { reservationDays: settings.reservationDays, unitCodeFormat: settings.unitCodeFormat, inactivityLockMinutes: settings.inactivityLockMinutes },
       billing: cb ? billingSummary(cb) : null,
     };
   });
 }
 
 export async function authRoutes(app: FastifyInstance) {
-  const sign = (userId: number, companyId: number | null) =>
-    app.jwt.sign({ sub: userId, cid: companyId }, { expiresIn: `${config.accessTokenMinutes}m` });
+  const sign = (userId: number, companyId: number | null, sid?: number) =>
+    app.jwt.sign({ sub: userId, cid: companyId, sid }, { expiresIn: `${config.accessTokenMinutes}m` });
 
   function setRefreshCookie(reply: FastifyReply, token: string) {
     reply.setCookie(COOKIE, token, {
@@ -69,7 +69,7 @@ export async function authRoutes(app: FastifyInstance) {
     });
   }
 
-  async function session(userId: number, companyId: number | null) {
+  async function session(userId: number, companyId: number | null, sid?: number) {
     return withGlobal(async (db) => {
       const u = await db.one<any>(
         'SELECT id, username, email, full_name, language, is_platform_admin, must_change_password FROM users WHERE id = $1', [userId]);
@@ -78,7 +78,7 @@ export async function authRoutes(app: FastifyInstance) {
       if (!active && companies.length === 1) active = companies[0].id;
       const access = active ? await effectivePermissions(active, userId) : null;
       return {
-        accessToken: sign(userId, active),
+        accessToken: sign(userId, active, sid),
         user: {
           id: u.id, username: u.username, email: u.email, fullName: u.full_name, language: u.language,
           isPlatformAdmin: u.is_platform_admin, mustChangePassword: u.must_change_password,
@@ -90,13 +90,14 @@ export async function authRoutes(app: FastifyInstance) {
     });
   }
 
-  async function newRefresh(reply: FastifyReply, userId: number, companyId: number | null, req: { headers: any; ip: string }) {
+  /** Crea la fila de sesión (una por dispositivo) y devuelve su id -sirve de "sid" en el token de acceso- y el token de la cookie. */
+  async function newRefresh(userId: number, companyId: number | null, req: { headers: any; ip: string }): Promise<{ id: number; token: string }> {
     const { token, hash } = newOpaqueToken();
-    await withGlobal((db) => db.query(
+    const row = await withGlobal((db) => db.one<{ id: number }>(
       `INSERT INTO refresh_tokens (user_id, company_id, token_hash, expires_at, user_agent, ip)
-       VALUES ($1,$2,$3, now() + make_interval(days => $4), $5, $6)`,
+       VALUES ($1,$2,$3, now() + make_interval(days => $4), $5, $6) RETURNING id`,
       [userId, companyId, hash, config.refreshTokenDays, String(req.headers['user-agent'] ?? '').slice(0, 300), req.ip]));
-    setRefreshCookie(reply, token);
+    return { id: row.id, token };
   }
 
   // ---- Iniciar sesión ----
@@ -108,8 +109,15 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user || !ok || !user.is_active) throw unauthorized('invalid_credentials');
 
     await withGlobal((db) => db.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]));
-    const s = await session(user.id, null);
-    await newRefresh(reply, user.id, s.activeCompanyId, req);
+    // Un solo dispositivo a la vez: cualquier otra sesión abierta de este usuario se cierra ahora mismo
+    // (no cuando se le venza el token de acceso).
+    const revoked = await withGlobal((db) => db.rows<{ id: number }>(
+      `UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL RETURNING id`, [user.id]));
+    for (const r of revoked) invalidateSessionCache(r.id);
+    const { id: sid, token } = await newRefresh(user.id, null, req);
+    setRefreshCookie(reply, token);
+    const s = await session(user.id, null, sid);
+    if (s.activeCompanyId) await withGlobal((db) => db.query('UPDATE refresh_tokens SET company_id = $2 WHERE id = $1', [sid, s.activeCompanyId]));
     return s;
   });
 
@@ -126,7 +134,7 @@ export async function authRoutes(app: FastifyInstance) {
     // Renovación deslizante: mientras se use, la sesión sigue viva.
     await withGlobal((db) => db.query(
       'UPDATE refresh_tokens SET expires_at = now() + make_interval(days => $2) WHERE id = $1', [row.id, config.refreshTokenDays]));
-    return session(row.user_id, row.company_id);
+    return session(row.user_id, row.company_id, row.id);
   });
 
   app.post('/api/auth/logout', async (req, reply) => {
@@ -145,8 +153,17 @@ export async function authRoutes(app: FastifyInstance) {
     if (!m) throw forbidden('no_company_access');
     const raw = c.req.cookies[COOKIE];
     if (raw) await c.db.query('UPDATE refresh_tokens SET company_id = $2 WHERE token_hash = $1', [hashToken(raw), companyId]);
-    return session(c.userId, companyId);
+    return session(c.userId, companyId, c.req.user.sid);
   }));
+
+  // ---- Desbloquear tras el bloqueo por inactividad: confirma la contraseña sin cerrar la sesión ----
+  app.post('/api/auth/unlock', { config: { rateLimit: { max: process.env.NODE_ENV === 'test' ? 10_000 : 12, timeWindow: '1 minute' } } },
+    userRoute(async (c) => {
+      const { password } = c.body(z.object({ password: z.string().min(1).max(200) }));
+      const u = await c.db.one<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = $1', [c.userId]);
+      if (!(await verifyPassword(password, u.password_hash))) throw unauthorized('invalid_credentials');
+      return { ok: true };
+    }));
 
   // ---- Perfil ----
   app.patch('/api/auth/profile', userRoute(async (c) => {
@@ -173,8 +190,10 @@ export async function authRoutes(app: FastifyInstance) {
     await c.db.query('UPDATE users SET password_hash = $2, must_change_password = false WHERE id = $1', [c.userId, await hashPassword(next)]);
     // Cierra las demás sesiones abiertas (conserva la actual).
     const raw = c.req.cookies[COOKIE];
-    await c.db.query('UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND token_hash <> $2 AND revoked_at IS NULL',
+    const revoked = await c.db.rows<{ id: number }>(
+      'UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND token_hash <> $2 AND revoked_at IS NULL RETURNING id',
       [c.userId, raw ? hashToken(raw) : '']);
+    for (const r of revoked) invalidateSessionCache(r.id);
     return { ok: true };
   }));
 }

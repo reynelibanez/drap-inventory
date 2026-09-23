@@ -5,6 +5,7 @@ import { useAuth } from './lib/auth';
 import { MetaProvider } from './lib/meta';
 import { Shell } from './components/Shell';
 import { Guard } from './components/Guard';
+import { LockScreen } from './components/LockScreen';
 import { Button, Empty, Spinner } from './components/ui';
 import { CompanyPickerPage, ForcePasswordPage, LoginPage } from './pages/Login';
 import DashboardPage from './pages/Dashboard';
@@ -60,7 +61,7 @@ function Home() {
 }
 
 export default function App() {
-  const { status, user, company, access, retryConnection } = useAuth();
+  const { status, user, company, access, retryConnection, locked } = useAuth();
   const { t } = useTranslation();
   if (status === 'unreachable') {
     return (
@@ -76,7 +77,9 @@ export default function App() {
   // Prueba vencida o suscripción cancelada: el admin de plataforma nunca queda bloqueado (para poder dar soporte).
   if (access?.billing?.blocked && !user?.isPlatformAdmin) return <BillingBlockedPage />;
   return (
-    <MetaProvider>
+    <>
+      {locked && <LockScreen />}
+      <MetaProvider>
       <Routes>
         <Route element={<Shell />}>
           <Route index element={<Home />} />
@@ -119,6 +122,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
-    </MetaProvider>
+      </MetaProvider>
+    </>
   );
 }

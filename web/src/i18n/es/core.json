@@ -155,7 +155,12 @@
     "show_password": "Mostrar contraseña",
     "hide_password": "Ocultar contraseña",
     "version": "Versión {{v}}",
-    "protected": "Conexión protegida"
+    "protected": "Conexión protegida",
+    "lock_title": "Bloqueado por inactividad",
+    "lock_hint": "Ingresa tu contraseña para continuar donde estabas.",
+    "unlock": "Desbloquear",
+    "unlock_offline": "Se necesita conexión a internet para desbloquear.",
+    "session_closed_elsewhere": "Cerramos tu sesión acá porque este usuario inició sesión en otro dispositivo."
   },
   "errors": {
     "generic": "Ocurrió un error inesperado. Inténtalo de nuevo.",
@@ -300,6 +305,7 @@
     "stripe_session_without_url": "No se pudo iniciar el pago. Inténtalo de nuevo.",
     "no_stripe_customer": "Esta empresa todavía no tiene un pago registrado en Stripe.",
     "plan_user_limit": "El plan actual permite hasta {{max}} usuarios. Sube de plan para agregar más.",
-    "plan_location_limit": "El plan actual permite hasta {{max}} almacenes. Sube de plan para agregar más."
+    "plan_location_limit": "El plan actual permite hasta {{max}} almacenes. Sube de plan para agregar más.",
+    "session_revoked": "Se cerró tu sesión porque este usuario inició sesión en otro dispositivo."
   }
 }
