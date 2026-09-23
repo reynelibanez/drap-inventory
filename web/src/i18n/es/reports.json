@@ -1,0 +1,189 @@
+{
+  "reports": {
+    "title": "Reportes",
+    "subtitle": "Reportes estándar y personalizados con la información del sistema. Cada usuario ve solo lo que su rol le permite.",
+    "new": "Nuevo reporte",
+    "search": "Buscar reportes…",
+    "empty": "Todavía no hay reportes disponibles",
+    "empty_hint": "Crea uno propio con el botón «Nuevo reporte».",
+    "none_mine": "Aún no has creado reportes propios. Solo tú puedes ver los reportes privados.",
+    "g_mine": "Mis reportes",
+    "g_mine_hint": "Privados: solo los ves tú.",
+    "g_company": "Compartidos con la empresa",
+    "g_company_hint": "Los ven todos los usuarios que tengan acceso a esa información.",
+    "g_system": "Reportes estándar",
+    "g_system_hint": "Vienen con el sistema. Puedes personalizarlos haciendo una copia.",
+    "mode_detail_short": "Detalle",
+    "mode_summary_short": "Resumen",
+    "created_by": "Creado por",
+    "customize": "Personalizar (crear una copia)",
+    "duplicate": "Duplicar",
+    "duplicated": "Copia creada. Ya puedes personalizarla.",
+    "delete_title": "¿Eliminar el reporte «{{name}}»?",
+    "delete_msg": "Esta acción no se puede deshacer.",
+    "back": "Reportes",
+    "refresh": "Actualizar",
+    "truncated": "El reporte tiene más de {{count}} filas; se muestran las primeras {{count}}. Agrega filtros para acotarlo.",
+    "no_rows": "El reporte no devolvió filas",
+    "visibility_company": "Compartido",
+    "visibility_private": "Privado",
+    "ds": {
+      "units": "Equipos (inventario)",
+      "lots": "Lotes",
+      "lot_lines": "Líneas de lote",
+      "orders": "Pedidos de venta",
+      "order_items": "Equipos de pedidos (detalle)",
+      "locations": "Espacios de almacén"
+    },
+    "type": {
+      "text": "Texto",
+      "number": "Número",
+      "money": "Importe",
+      "date": "Fecha",
+      "datetime": "Fecha y hora",
+      "boolean": "Sí / No",
+      "select": "Lista"
+    },
+    "op": {
+      "lastDays": "en los últimos N días",
+      "thisMonth": "de este mes",
+      "thisYear": "de este año"
+    },
+    "d_new": "Nuevo reporte",
+    "d_edit": "Editar reporte",
+    "d_subtitle": "Escoge la información, el orden de las columnas, los filtros y cómo agrupar. La vista previa se actualiza sola.",
+    "d_general": "Datos generales",
+    "d_name_ph": "Ej. Laptops disponibles por marca",
+    "d_source": "Información del reporte",
+    "d_source_hint": "De dónde salen los datos. Solo aparece lo que tu rol puede ver.",
+    "d_change_title": "Cambiar la información del reporte",
+    "d_change_msg": "Se quitarán las columnas, filtros y orden actuales.",
+    "d_change_ok": "Cambiar",
+    "d_visibility": "¿Quién puede verlo?",
+    "d_vis_private": "Solo yo",
+    "d_vis_private_hint": "Privado: nadie más lo verá, ni siquiera un administrador.",
+    "d_vis_company": "Toda la empresa",
+    "d_vis_company_hint": "Lo verán los usuarios que puedan ver esa información.",
+    "d_vis_company_denied": "Tu rol no permite compartir reportes.",
+    "d_columns": "Columnas",
+    "d_mode": "Tipo de reporte",
+    "d_mode_detail": "Detalle",
+    "d_mode_detail_hint": "Una fila por cada elemento (por ejemplo, cada equipo).",
+    "d_mode_summary": "Resumen",
+    "d_mode_summary_hint": "Agrupa las filas y calcula totales: elige por qué agrupar y qué contar o sumar.",
+    "d_available": "Campos disponibles",
+    "d_search_fields": "Buscar campo…",
+    "d_add": "Agregar como columna",
+    "d_chosen": "Columnas del reporte",
+    "d_no_cols": "Agrega columnas desde la lista de campos.",
+    "d_count_rows": "Cantidad de filas",
+    "d_group_by": "Agrupar por este campo",
+    "d_agg_label": "Cálculo",
+    "d_agg": {
+      "count": "Contar",
+      "countDistinct": "Contar distintos",
+      "sum": "Sumar",
+      "avg": "Promedio",
+      "min": "Mínimo",
+      "max": "Máximo"
+    },
+    "d_col_title": "Título de la columna",
+    "d_drag_hint": "Arrastra las columnas para cambiar su orden.",
+    "d_move_up": "Subir",
+    "d_move_down": "Bajar",
+    "d_remove": "Quitar",
+    "d_unavailable": "No disponible",
+    "d_filters": "Filtros",
+    "d_filters_hint": "Solo entran al reporte las filas que cumplan todos los filtros. Las fechas relativas (últimos N días, este mes) se recalculan cada vez que abres el reporte.",
+    "d_add_filter": "Agregar filtro",
+    "d_no_filters": "Sin filtros: se incluye todo.",
+    "d_field": "Campo",
+    "d_operator": "Condición",
+    "d_value": "Valor",
+    "d_pick": "Escoger…",
+    "d_days": "días",
+    "d_filter_incomplete": "Falta el valor: se ignora por ahora",
+    "d_sort": "Orden",
+    "d_add_sort": "Agregar orden",
+    "d_no_sort": "Orden automático.",
+    "d_sort_col": "Columna",
+    "d_direction": "Dirección",
+    "d_asc": "Ascendente (A→Z, menor a mayor)",
+    "d_desc": "Descendente (Z→A, mayor a menor)",
+    "d_limit": "Máximo de filas",
+    "d_limit_hint": "Opcional. Hasta 50 000.",
+    "d_preview": "Vista previa",
+    "d_preview_hint": "Muestra hasta {{count}} filas.",
+    "d_preview_more": "Hay más filas: se verán todas al ejecutar el reporte.",
+    "d_updating": "Actualizando…",
+    "d_need_cols": "Agrega al menos una columna.",
+    "d_need_agg": "Un reporte de resumen necesita al menos un cálculo (contar, sumar…). Puedes agregar «Cantidad de filas».",
+    "d_unavailable_msg": "Hay campos que ya no están disponibles.",
+    "d_no_access": "No tienes permiso para ver la información de este reporte.",
+    "d_saved": "Reporte guardado"
+  },
+  "reportsGroup": {
+    "unit": "Equipo",
+    "grades": "Grados",
+    "location": "Ubicación",
+    "lot": "Lote",
+    "sale": "Venta",
+    "price": "Costos y precios",
+    "stats": "Cantidades",
+    "attrs": "Características"
+  },
+  "reportsSys": {
+    "inventory_stock": {
+      "name": "Inventario en existencia",
+      "desc": "Equipos disponibles, reservados y no vendibles, con sus características y ubicación."
+    },
+    "stock_by_type_grade": {
+      "name": "Existencias por tipo y grado",
+      "desc": "Cuántos equipos disponibles hay de cada tipo, grado cosmético y grado funcional."
+    },
+    "stock_by_model": {
+      "name": "Existencias por marca y modelo",
+      "desc": "Cantidad de equipos disponibles agrupados por tipo, marca y modelo."
+    },
+    "stock_by_location": {
+      "name": "Existencias por ubicación",
+      "desc": "Cantidad de equipos en existencia por almacén, área y rack."
+    },
+    "unplaced_units": {
+      "name": "Equipos sin ubicar",
+      "desc": "Equipos en existencia que todavía no tienen un espacio asignado."
+    },
+    "tested_by_tech": {
+      "name": "Testeo por técnico (30 días)",
+      "desc": "Equipos testeados por cada técnico en los últimos 30 días."
+    },
+    "lots_status": {
+      "name": "Lotes: esperado, contado y testeado",
+      "desc": "Estado de cada lote con cantidades esperadas, contadas, registradas y disponibles."
+    },
+    "lot_lines_detail": {
+      "name": "Líneas de lote",
+      "desc": "Detalle de las líneas de cada lote: tipo, marca, modelo y cantidades."
+    },
+    "orders_open": {
+      "name": "Pedidos abiertos",
+      "desc": "Pedidos en curso con cliente, vendedor, vencimiento de la reserva y avance."
+    },
+    "sold_units": {
+      "name": "Equipos vendidos",
+      "desc": "Detalle de los equipos de pedidos completados, con cliente y precio (si tienes permiso de precios)."
+    },
+    "sales_by_customer": {
+      "name": "Ventas por cliente (cantidades)",
+      "desc": "Pedidos y equipos vendidos a cada cliente."
+    },
+    "revenue_by_customer": {
+      "name": "Ventas por cliente (importes)",
+      "desc": "Total vendido a cada cliente. Solo para quien puede ver precios."
+    },
+    "slot_occupancy": {
+      "name": "Ocupación de almacenes",
+      "desc": "Capacidad, espacios ocupados y libres por almacén."
+    }
+  }
+}

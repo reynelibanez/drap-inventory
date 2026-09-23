@@ -1,0 +1,189 @@
+{
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Standard and custom reports built from the system's data. Each user sees only what their role allows.",
+    "new": "New report",
+    "search": "Search reports…",
+    "empty": "There are no reports available yet",
+    "empty_hint": "Create your own with the “New report” button.",
+    "none_mine": "You haven't created any reports yet. Only you can see private reports.",
+    "g_mine": "My reports",
+    "g_mine_hint": "Private: only you can see them.",
+    "g_company": "Shared with the company",
+    "g_company_hint": "Visible to every user who has access to that information.",
+    "g_system": "Standard reports",
+    "g_system_hint": "Included with the system. Make a copy to customize them.",
+    "mode_detail_short": "Detail",
+    "mode_summary_short": "Summary",
+    "created_by": "Created by",
+    "customize": "Customize (make a copy)",
+    "duplicate": "Duplicate",
+    "duplicated": "Copy created. You can customize it now.",
+    "delete_title": "Delete the report “{{name}}”?",
+    "delete_msg": "This cannot be undone.",
+    "back": "Reports",
+    "refresh": "Refresh",
+    "truncated": "The report has more than {{count}} rows; showing the first {{count}}. Add filters to narrow it down.",
+    "no_rows": "The report returned no rows",
+    "visibility_company": "Shared",
+    "visibility_private": "Private",
+    "ds": {
+      "units": "Units (inventory)",
+      "lots": "Lots",
+      "lot_lines": "Lot lines",
+      "orders": "Sales orders",
+      "order_items": "Order items (detail)",
+      "locations": "Warehouse slots"
+    },
+    "type": {
+      "text": "Text",
+      "number": "Number",
+      "money": "Amount",
+      "date": "Date",
+      "datetime": "Date and time",
+      "boolean": "Yes / No",
+      "select": "List"
+    },
+    "op": {
+      "lastDays": "in the last N days",
+      "thisMonth": "this month",
+      "thisYear": "this year"
+    },
+    "d_new": "New report",
+    "d_edit": "Edit report",
+    "d_subtitle": "Choose the data, the column order, filters and how to group. The preview updates by itself.",
+    "d_general": "General",
+    "d_name_ph": "E.g. Available laptops by brand",
+    "d_source": "Report data",
+    "d_source_hint": "Where the data comes from. Only what your role can see is listed.",
+    "d_change_title": "Change the report data",
+    "d_change_msg": "The current columns, filters and sorting will be removed.",
+    "d_change_ok": "Change",
+    "d_visibility": "Who can see it?",
+    "d_vis_private": "Only me",
+    "d_vis_private_hint": "Private: nobody else will see it, not even an administrator.",
+    "d_vis_company": "The whole company",
+    "d_vis_company_hint": "Users who can see that information will see it.",
+    "d_vis_company_denied": "Your role cannot share reports.",
+    "d_columns": "Columns",
+    "d_mode": "Report type",
+    "d_mode_detail": "Detail",
+    "d_mode_detail_hint": "One row per item (for example, each unit).",
+    "d_mode_summary": "Summary",
+    "d_mode_summary_hint": "Groups rows and calculates totals: choose what to group by and what to count or add up.",
+    "d_available": "Available fields",
+    "d_search_fields": "Search field…",
+    "d_add": "Add as a column",
+    "d_chosen": "Report columns",
+    "d_no_cols": "Add columns from the field list.",
+    "d_count_rows": "Number of rows",
+    "d_group_by": "Group by this field",
+    "d_agg_label": "Calculation",
+    "d_agg": {
+      "count": "Count",
+      "countDistinct": "Count distinct",
+      "sum": "Sum",
+      "avg": "Average",
+      "min": "Minimum",
+      "max": "Maximum"
+    },
+    "d_col_title": "Column title",
+    "d_drag_hint": "Drag columns to change their order.",
+    "d_move_up": "Move up",
+    "d_move_down": "Move down",
+    "d_remove": "Remove",
+    "d_unavailable": "Not available",
+    "d_filters": "Filters",
+    "d_filters_hint": "Only rows meeting all filters are included. Relative dates (last N days, this month) are recalculated every time the report is opened.",
+    "d_add_filter": "Add filter",
+    "d_no_filters": "No filters: everything is included.",
+    "d_field": "Field",
+    "d_operator": "Condition",
+    "d_value": "Value",
+    "d_pick": "Choose…",
+    "d_days": "days",
+    "d_filter_incomplete": "Value missing: ignored for now",
+    "d_sort": "Sorting",
+    "d_add_sort": "Add sorting",
+    "d_no_sort": "Automatic order.",
+    "d_sort_col": "Column",
+    "d_direction": "Direction",
+    "d_asc": "Ascending (A→Z, low to high)",
+    "d_desc": "Descending (Z→A, high to low)",
+    "d_limit": "Maximum rows",
+    "d_limit_hint": "Optional. Up to 50,000.",
+    "d_preview": "Preview",
+    "d_preview_hint": "Shows up to {{count}} rows.",
+    "d_preview_more": "There are more rows: you'll see them all when running the report.",
+    "d_updating": "Updating…",
+    "d_need_cols": "Add at least one column.",
+    "d_need_agg": "A summary report needs at least one calculation (count, sum…). You can add “Number of rows”.",
+    "d_unavailable_msg": "Some fields are no longer available.",
+    "d_no_access": "You don't have permission to see this report's data.",
+    "d_saved": "Report saved"
+  },
+  "reportsGroup": {
+    "unit": "Unit",
+    "grades": "Grades",
+    "location": "Location",
+    "lot": "Lot",
+    "sale": "Sale",
+    "price": "Costs and prices",
+    "stats": "Quantities",
+    "attrs": "Characteristics"
+  },
+  "reportsSys": {
+    "inventory_stock": {
+      "name": "Inventory in stock",
+      "desc": "Available, reserved and not-sellable units with their characteristics and location."
+    },
+    "stock_by_type_grade": {
+      "name": "Stock by type and grade",
+      "desc": "How many available units there are of each type, cosmetic grade and functional grade."
+    },
+    "stock_by_model": {
+      "name": "Stock by brand and model",
+      "desc": "Available units grouped by type, brand and model."
+    },
+    "stock_by_location": {
+      "name": "Stock by location",
+      "desc": "Units in stock per warehouse, area and rack."
+    },
+    "unplaced_units": {
+      "name": "Units not placed",
+      "desc": "Units in stock that do not have a slot assigned yet."
+    },
+    "tested_by_tech": {
+      "name": "Testing by technician (30 days)",
+      "desc": "Units tested by each technician in the last 30 days."
+    },
+    "lots_status": {
+      "name": "Lots: expected, counted and tested",
+      "desc": "Status of each lot with expected, counted, registered and available quantities."
+    },
+    "lot_lines_detail": {
+      "name": "Lot lines",
+      "desc": "Detail of each lot's lines: type, brand, model and quantities."
+    },
+    "orders_open": {
+      "name": "Open orders",
+      "desc": "Orders in progress with customer, seller, reservation expiry and progress."
+    },
+    "sold_units": {
+      "name": "Units sold",
+      "desc": "Detail of units in completed orders, with customer and price (if you can see prices)."
+    },
+    "sales_by_customer": {
+      "name": "Sales by customer (quantities)",
+      "desc": "Orders and units sold to each customer."
+    },
+    "revenue_by_customer": {
+      "name": "Sales by customer (amounts)",
+      "desc": "Total sold to each customer. Only for those who can see prices."
+    },
+    "slot_occupancy": {
+      "name": "Warehouse occupancy",
+      "desc": "Capacity, used and free slots per warehouse."
+    }
+  }
+}

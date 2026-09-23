@@ -1,0 +1,8 @@
+{
+  "partners": {
+    "suppliers": "Proveedores", "suppliers_hint": "A quién le compras los lotes", "new_supplier": "Nuevo proveedor", "edit_supplier": "Editar proveedor", "no_suppliers": "No hay proveedores",
+    "customers": "Clientes", "customers_hint": "Importadores y compradores", "new_customer": "Nuevo cliente", "edit_customer": "Editar cliente", "no_customers": "No hay clientes",
+    "sellers": "Vendedores", "sellers_hint": "Quién atiende cada venta", "new_seller": "Nuevo vendedor", "edit_seller": "Editar vendedor", "no_sellers": "No hay vendedores",
+    "contact": "Contacto", "customer_type": "Tipo de cliente", "tax_id": "Identificación fiscal", "linked_user": "Usuario del sistema (opcional)"
+  }
+}

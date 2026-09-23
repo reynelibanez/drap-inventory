@@ -1,0 +1,17 @@
+{
+  "appearance": {
+    "title": "Apariencia",
+    "subtitle": "DRAP Inventory usa los colores de la marca DRAP Systems en dos temas. Se guarda en este navegador y solo lo ves tú.",
+    "theme": "Tema",
+    "name_system": "Automático",
+    "name_light": "DRAP Claro",
+    "name_dark": "DRAP Noche",
+    "hint_system": "Cambia solo entre Claro y Noche según tu equipo.",
+    "hint_light": "Fondo claro con azul Tech Blue. Ideal para oficina.",
+    "hint_dark": "Azul noche con acento cian. Descansa la vista.",
+    "density": "Densidad",
+    "density_comfortable": "Cómoda",
+    "density_compact": "Compacta (más filas en pantalla)",
+    "saved_here": "La apariencia se recuerda en este navegador."
+  }
+}

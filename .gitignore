@@ -1,0 +1,16 @@
+node_modules
+dist
+.env
+*.log
+.DS_Store
+backups
+data/
+
+release/
+
+# Windows / carpeta local
+desktop.ini
+Thumbs.db
+drap-inventory-ca.crt
+.megaignore
+Claude outputs/

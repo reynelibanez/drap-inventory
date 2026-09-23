@@ -1,0 +1,17 @@
+{
+  "appearance": {
+    "title": "Appearance",
+    "subtitle": "DRAP Inventory uses the DRAP Systems brand colors in two themes. Saved in this browser; only you see it.",
+    "theme": "Theme",
+    "name_system": "Automatic",
+    "name_light": "DRAP Light",
+    "name_dark": "DRAP Night",
+    "hint_system": "Switches between Light and Night following your device.",
+    "hint_light": "Light background with Tech Blue. Great for the office.",
+    "hint_dark": "Night blue with a cyan accent. Easier on the eyes.",
+    "density": "Density",
+    "density_comfortable": "Comfortable",
+    "density_compact": "Compact (more rows on screen)",
+    "saved_here": "Appearance is remembered in this browser."
+  }
+}
