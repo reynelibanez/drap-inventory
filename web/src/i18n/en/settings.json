@@ -56,6 +56,11 @@
     "edit_attr": "Edit attribute",
     "catalog": "Catalog",
     "datatype_locked": "The data type cannot be changed because data may already be stored.",
+    "enable_multiple_hint": "Can this equipment have the same component more than once (e.g. two hard drives)? You can allow choosing several values for this attribute without losing what's already stored.",
+    "enable_multiple_action": "Allow several values",
+    "enable_multiple_title": "Allow several values for this attribute?",
+    "enable_multiple_confirm": "From now on you'll be able to pick more than one value in \"{{name}}\". Nothing already stored is lost. This change can't be undone.",
+    "enable_multiple_done": "Done: you can now pick several values for this attribute.",
     "unit_hint": "E.g.: GB, %, in",
     "datatype": {
       "text": "Text",

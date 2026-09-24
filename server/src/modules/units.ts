@@ -15,10 +15,12 @@ const UNIT_SELECT = `
          u.lot_id AS "lotId", l.code AS "lotCode", u.lot_line_id AS "lotLineId",
          u.equipment_type_id AS "equipmentTypeId", u.status_id AS "statusId", st.system_key AS "statusKey",
          u.cosmetic_grade_id AS "cosmeticGradeId", u.functional_grade_id AS "functionalGradeId",
+         u.cosmetic_grade_note AS "cosmeticGradeNote", u.functional_grade_note AS "functionalGradeNote",
          u.slot_id AS "slotId", sl.code AS "slotCode", u.tester_number AS "testerNumber",
          u.tested_at AS "testedAt", u.created_at AS "createdAt", u.updated_at AS "updatedAt",
          o.id AS "orderId", o.code AS "orderCode", o.created_by AS "_orderBy", o.seller_membership AS "_orderSeller",
-         u.cost, u.cost_source AS "costSource", u.list_price AS "listPrice", u.price_source AS "priceSource"
+         u.cost, u.cost_source AS "costSource", u.list_price AS "listPrice", u.price_source AS "priceSource",
+         COALESCE(pr.n, 0) AS "printCount", pr.last_at AS "lastPrintedAt", lastp.full_name AS "lastPrintedByName"
     FROM units u
     JOIN lots l ON l.id = u.lot_id
     JOIN catalog_items st ON st.id = u.status_id
@@ -26,7 +28,12 @@ const UNIT_SELECT = `
     LEFT JOIN LATERAL (
       SELECT so.id, so.code, so.created_by, (SELECT se.membership_id FROM sellers se WHERE se.id = so.seller_id) AS seller_membership
         FROM sale_items si JOIN sales_orders so ON so.id = si.order_id
-       WHERE si.unit_id = u.id AND si.released_at IS NULL LIMIT 1) o ON true`;
+       WHERE si.unit_id = u.id AND si.released_at IS NULL LIMIT 1) o ON true
+    LEFT JOIN LATERAL (
+      SELECT count(*)::int AS n, max(printed_at) AS last_at FROM unit_label_prints ulp WHERE ulp.unit_id = u.id) pr ON true
+    LEFT JOIN LATERAL (
+      SELECT us.full_name FROM unit_label_prints ulp2 JOIN users us ON us.id = ulp2.printed_by
+       WHERE ulp2.unit_id = u.id ORDER BY ulp2.printed_at DESC LIMIT 1) lastp ON true`;
 
 /** Costos solo para quien puede verlos (costs.view) y precios de lista para quien trabaja con precios. */
 export function redactUnit<T>(c: Ctx, row: T): T {
@@ -155,6 +162,40 @@ export async function unitRoutes(app: FastifyInstance) {
     const list = [...new Set(ids.split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 500);
     const items = list.length ? (await c.db.rows<any>(`${UNIT_SELECT} WHERE u.id = ANY($1::bigint[]) ORDER BY u.id`, [list])).map((u) => redactUnit(c, u)) : [];
     return { items };
+  }));
+
+  // Registro de que se mandó a imprimir la etiqueta de estos equipos (quién y cuándo). Un registro por
+  // equipo por cada vez que se imprime (no por cada copia): así "printCount" refleja cuántas veces se
+  // mandó a imprimir, sea desde Testeo, Inventario, el detalle de un lote o el de un equipo.
+  app.post('/api/units/print-log', route('units.view', async (c) => {
+    const { unitIds } = c.body(z.object({ unitIds: z.array(zId).min(1).max(500) }));
+    const ids = [...new Set(unitIds)];
+    const valid = (await c.db.rows<{ id: number }>('SELECT id FROM units WHERE id = ANY($1::bigint[])', [ids])).map((r) => r.id);
+    if (valid.length) {
+      await c.db.query(
+        `INSERT INTO unit_label_prints (company_id, unit_id, printed_by) SELECT $1, x, $2 FROM unnest($3::bigint[]) AS x`,
+        [c.companyId, c.userId, valid]);
+    }
+    return { ok: true, logged: valid.length };
+  }));
+
+  // Sugerencias de notas: valores ya usados antes en ese mismo campo (notas generales,
+  // nota de grado cosmético o nota de grado funcional), para no volver a escribir lo mismo.
+  const NOTE_SUGGESTION_COLUMNS = {
+    notes: 'notes',
+    cosmeticGradeNote: 'cosmetic_grade_note',
+    functionalGradeNote: 'functional_grade_note',
+  } as const;
+  app.get('/api/units/note-suggestions', route('units.view', async (c) => {
+    const { field } = c.query(z.object({ field: z.enum(['notes', 'cosmeticGradeNote', 'functionalGradeNote']) }));
+    const column = NOTE_SUGGESTION_COLUMNS[field];
+    const rows = await c.db.rows<{ value: string }>(
+      `SELECT ${column} AS value FROM (
+         SELECT DISTINCT ON (${column}) ${column}, max(updated_at) OVER (PARTITION BY ${column}) AS last_used
+         FROM units
+         WHERE ${column} IS NOT NULL AND btrim(${column}) <> ''
+       ) x ORDER BY last_used DESC LIMIT 50`);
+    return { suggestions: rows.map((r) => r.value) };
   }));
 
   // Escaneo / búsqueda exacta: código completo, forma corta (1t120) o número de serie.
@@ -287,6 +328,8 @@ export async function unitRoutes(app: FastifyInstance) {
       specs: specsInput.optional(),
       cosmeticGradeId: zId.nullable().optional(),
       functionalGradeId: zId.nullable().optional(),
+      cosmeticGradeNote: z.string().trim().max(1000).nullable().optional(),
+      functionalGradeNote: z.string().trim().max(1000).nullable().optional(),
       notes: z.string().trim().max(1000).nullable().optional(),
     }));
     const unit = await loadUnit(c, id, true);
@@ -313,16 +356,21 @@ export async function unitRoutes(app: FastifyInstance) {
     if (serial !== undefined) { await assertSerialFree(c, serial, id); changes.serial = serial; }
     if (b.cosmeticGradeId !== undefined) changes.cosmeticGradeId = b.cosmeticGradeId;
     if (b.functionalGradeId !== undefined) changes.functionalGradeId = b.functionalGradeId;
+    if (b.cosmeticGradeNote !== undefined) changes.cosmeticGradeNote = b.cosmeticGradeNote;
+    if (b.functionalGradeNote !== undefined) changes.functionalGradeNote = b.functionalGradeNote;
 
     await c.db.query(
       `UPDATE units SET specs = COALESCE($2::jsonb, specs),
               serial_number = CASE WHEN $3::boolean THEN $4 ELSE serial_number END,
               cosmetic_grade_id = CASE WHEN $5::boolean THEN $6::bigint ELSE cosmetic_grade_id END,
               functional_grade_id = CASE WHEN $7::boolean THEN $8::bigint ELSE functional_grade_id END,
-              notes = CASE WHEN $9::boolean THEN $10 ELSE notes END
+              notes = CASE WHEN $9::boolean THEN $10 ELSE notes END,
+              cosmetic_grade_note = CASE WHEN $11::boolean THEN $12 ELSE cosmetic_grade_note END,
+              functional_grade_note = CASE WHEN $13::boolean THEN $14 ELSE functional_grade_note END
         WHERE id = $1`,
       [id, specs ? JSON.stringify(specs) : null, serial !== undefined, serial ?? null,
-        cos !== undefined, cos?.id ?? null, fun !== undefined, fun?.id ?? null, b.notes !== undefined, b.notes ?? null]);
+        cos !== undefined, cos?.id ?? null, fun !== undefined, fun?.id ?? null, b.notes !== undefined, b.notes ?? null,
+        b.cosmeticGradeNote !== undefined, b.cosmeticGradeNote ?? null, b.functionalGradeNote !== undefined, b.functionalGradeNote ?? null]);
 
     // Si un equipo disponible pasa a un grado funcional "no vendible", deja de estar disponible.
     if (fun && fun.meta?.sellable === false && unit.statusKey === 'available') {
@@ -403,6 +451,8 @@ export async function unitRoutes(app: FastifyInstance) {
     const b = c.body(z.object({
       cosmeticGradeId: zId,
       functionalGradeId: zId,
+      cosmeticGradeNote: z.string().trim().max(1000).nullish(),
+      functionalGradeNote: z.string().trim().max(1000).nullish(),
       serialNumber: z.string().max(100).nullish(),
       specs: specsInput.optional(),
       notes: z.string().trim().max(1000).nullish(),
@@ -427,9 +477,11 @@ export async function unitRoutes(app: FastifyInstance) {
 
     await c.db.query(
       `UPDATE units SET specs = $2, serial_number = $3, cosmetic_grade_id = $4, functional_grade_id = $5,
-              notes = CASE WHEN $6::boolean THEN $7 ELSE notes END, status_id = $8, tested_at = now()
+              notes = CASE WHEN $6::boolean THEN $7 ELSE notes END, status_id = $8, tested_at = now(),
+              cosmetic_grade_note = $9, functional_grade_note = $10
         WHERE id = $1`,
-      [id, JSON.stringify(specs), serial, b.cosmeticGradeId, b.functionalGradeId, b.notes !== undefined, b.notes ?? null, statusId]);
+      [id, JSON.stringify(specs), serial, b.cosmeticGradeId, b.functionalGradeId, b.notes !== undefined, b.notes ?? null, statusId,
+        b.cosmeticGradeNote ?? null, b.functionalGradeNote ?? null]);
     await c.audit('unit.tested', 'unit', id, { cosmeticGradeId: b.cosmeticGradeId, functionalGradeId: b.functionalGradeId, status: statusKey });
     // Precio de lista según las reglas (si están activadas y el equipo no tiene un precio fijado a mano).
     if (await autoPriceEnabled(c.db)) await applyPriceRules(c.db, { unitIds: [id], scope: 'unsold' });

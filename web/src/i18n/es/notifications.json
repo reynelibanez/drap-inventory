@@ -34,6 +34,7 @@
     "enabled_ok": "Notificaciones activadas",
     "disabled_ok": "Notificaciones desactivadas en este dispositivo",
     "denied_toast": "El navegador no dio permiso para notificar",
+    "not_ready_toast": "El navegador todavía estaba preparando la app para recibir avisos. Espera unos segundos y presiona “Activar” de nuevo.",
     "test_sent": "Prueba enviada a {{count}} dispositivo(s)",
     "test_none": "No tienes dispositivos con notificaciones activadas",
     "test_failed": "No se pudo entregar la prueba ({{failed}} de {{devices}} dispositivos)",

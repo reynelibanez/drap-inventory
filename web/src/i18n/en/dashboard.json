@@ -7,7 +7,8 @@
     "pick_first": "Choose first: {{name}}",
     "add_value_under": "It is added under the chosen brand: {{name}}.",
     "add_value_hint_child": "It is added to that brand’s list for all units. You can adjust its name later under Catalogs.",
-    "no_attributes": "This equipment type has no attributes configured."
+    "no_attributes": "This equipment type has no attributes configured.",
+    "add_another": "Add another value"
   },
   "dashboard": {
     "hello": "Hello, {{name}}",

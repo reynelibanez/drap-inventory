@@ -184,3 +184,55 @@ describe('/api/imports/tech: importación independiente de la plantilla de contr
     expect(dupRow).toBeTruthy();
   });
 });
+
+// Mismo mecanismo de "verificar por número de serie" que la importación genérica (ver imports.test.ts), pero para
+// la plantilla de control técnico: es la que Arianne usa a diario, así que tiene que ofrecer la misma opción.
+describe('/api/imports/tech con verifyOnTest: los equipos entran a testeo y se guarda lo declarado', () => {
+  it('crea el lote con requiresTesting y los equipos quedan en testeo (no disponibles), con una foto de lo declarado', async () => {
+    const csv = csvOf([
+      { lote: 'LV1', ref: 'REFV', serial: 'SNVERIFY-T1', brand: 'DELL', model: 'LATITUDE 5420', type: 'LAPTOP', processor: 'I7-1185G7', ram: '16GB', hdd: '512GB', diskType: 'NVME', lcdSize: "14''", cosmetic: 'A', win: 'WIN 11', functionalGrade: 'A' },
+    ]);
+    const r = await api.call('POST', '/api/imports/tech/commit', tok, { csv, verifyOnTest: true });
+    expect(r.status).toBe(200);
+    expect(r.body.created).toBe(1);
+    const lotOut = r.body.lots.find((l: any) => l.lote === 'LV1');
+
+    const lot = await api.call('GET', `/api/lots/${lotOut.lotId}`, tok);
+    expect(lot.body.requiresTesting).toBe(true);
+    expect(lot.body.statusKey).toBe('counted');
+
+    const units = (await api.call('GET', `/api/units?lotId=${lotOut.lotId}&pageSize=20`, tok)).body.items;
+    const unit = units.find((u: any) => u.serialNumber === 'SNVERIFY-T1');
+    expect(unit.statusKey).toBe('testing');
+    expect(unit.testedAt).toBeFalsy();
+    // Los datos ya vienen cargados desde la importación: se pueden revisar y terminar el testeo directamente.
+    expect(unit.specs.ram).toBeTruthy();
+
+    // Al terminar el testeo SIN cambiar nada, el reporte debe marcarlo como "llegó igual a lo declarado".
+    const finished = await api.call('POST', `/api/units/${unit.id}/finish-test`, tok, {
+      cosmeticGradeId: m.item('cosmetic_grade', 'A'),
+      functionalGradeId: m.item('functional_grade', 'A'),
+    });
+    expect(finished.status).toBe(200);
+
+    const preview = await api.call('POST', '/api/reports/preview', tok, {
+      dataset: 'units',
+      definition: { mode: 'detail', columns: [{ field: 'serial' }, { field: 'hasImportSnapshot' }, { field: 'matchesImportDeclared' }], filters: [{ field: 'code', op: 'eq', a: unit.code }], sort: [] },
+    });
+    expect(preview.status).toBe(200);
+    expect(preview.body.rows[0][1]).toBe(true);
+    expect(preview.body.rows[0][2]).toBe(true);
+  });
+
+  it('sin verifyOnTest (por defecto) el lote sigue sin requerir testeo, como antes', async () => {
+    const csv = csvOf([
+      { lote: 'LV2', ref: 'REFV2', serial: 'SNNOVERIFY-T1', brand: 'DELL', model: 'LATITUDE 5420', type: 'LAPTOP', processor: 'I7-1185G7', ram: '16GB', hdd: '512GB', diskType: 'NVME', cosmetic: 'A', functionalGrade: 'A' },
+    ]);
+    const r = await api.call('POST', '/api/imports/tech/commit', tok, { csv });
+    const lotOut = r.body.lots.find((l: any) => l.lote === 'LV2');
+    const lot = await api.call('GET', `/api/lots/${lotOut.lotId}`, tok);
+    expect(lot.body.requiresTesting).toBe(false);
+    const units = (await api.call('GET', `/api/units?lotId=${lotOut.lotId}&pageSize=20`, tok)).body.items;
+    expect(units.find((u: any) => u.serialNumber === 'SNNOVERIFY-T1').statusKey).toBe('available');
+  });
+});

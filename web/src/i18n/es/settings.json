@@ -56,6 +56,11 @@
     "edit_attr": "Editar atributo",
     "catalog": "Catálogo",
     "datatype_locked": "El tipo de dato no se puede cambiar porque ya puede haber datos guardados.",
+    "enable_multiple_hint": "¿Este equipo puede tener el mismo componente más de una vez (p. ej. dos discos duros)? Podés permitir elegir varios valores en este atributo sin perder lo ya guardado.",
+    "enable_multiple_action": "Permitir varios valores",
+    "enable_multiple_title": "¿Permitir varios valores en este atributo?",
+    "enable_multiple_confirm": "A partir de ahora se podrá elegir más de un valor en “{{name}}”. Lo que ya está guardado no se pierde. Este cambio no se puede deshacer.",
+    "enable_multiple_done": "Listo: ahora se pueden elegir varios valores en este atributo.",
     "unit_hint": "Ej.: GB, %, in",
     "datatype": {
       "text": "Texto",

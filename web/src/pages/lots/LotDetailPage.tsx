@@ -33,6 +33,7 @@ interface Line {
 }
 interface Lot {
   id: number; code: string; statusId: number; statusKey: string; supplierId: number | null; supplierName: string | null; purchaseDate: string;
+  expectedArrivalDate: string | null;
   reference: string | null; currency: string; totalCost: number | null; notes: string | null; requiresTesting: boolean; createdAt: string; lines: Line[];
   /** Solo con permiso de ver costos. */
   canSeeCosts?: boolean; extrasTotal?: number; landedCost?: number; costAppliedAt?: string | null;
@@ -171,6 +172,7 @@ export default function LotDetailPage() {
             { cells: [dt('common.status'), dmeta.name(lot.statusId)] },
             { cells: [dt('lots.supplier'), lot.supplierName ?? ''] },
             { cells: [dt('lots.purchase_date'), dfmt.date(lot.purchaseDate)] },
+            ...(lot.expectedArrivalDate ? [{ cells: [dt('lots.expected_arrival_date'), dfmt.date(lot.expectedArrivalDate)] }] : []),
             { cells: [dt('lots.reference'), lot.reference ?? ''] },
             { cells: [dt('lots.expected'), lot.summary.expected] },
             { cells: [dt('lots.counted'), lot.summary.counted] },
@@ -425,6 +427,7 @@ function LotInfo({ lot, onSaved, onDelete }: { lot: Lot; onSaved: () => void; on
   const suppliers = useQuery({ queryKey: ['suppliers', 'all'], queryFn: () => api.get<{ items: { id: number; name: string }[] }>('/suppliers?all=1'), enabled: can('suppliers.view') });
   const [supplierId, setSupplierId] = useState(lot.supplierId ? String(lot.supplierId) : '');
   const [date, setDate] = useState(lot.purchaseDate.slice(0, 10));
+  const [expectedArrival, setExpectedArrival] = useState(lot.expectedArrivalDate?.slice(0, 10) ?? '');
   const [reference, setReference] = useState(lot.reference ?? '');
   const initialCost = lot.totalCost === null || lot.totalCost === undefined ? '' : String(lot.totalCost);
   const [cost, setCost] = useState(initialCost);
@@ -437,7 +440,8 @@ function LotInfo({ lot, onSaved, onDelete }: { lot: Lot; onSaved: () => void; on
     setBusy(true);
     try {
       await api.patch(`/lots/${lot.id}`, {
-        supplierId: supplierId ? Number(supplierId) : null, purchaseDate: date, reference: reference || null, notes: notes || null,
+        supplierId: supplierId ? Number(supplierId) : null, purchaseDate: date, expectedArrivalDate: expectedArrival || null,
+        reference: reference || null, notes: notes || null,
         requiresTesting,
         // El costo de la mercancía solo lo cambia quien puede administrar costos.
         ...(can('costs.manage') && cost !== initialCost ? { totalCost: cost === '' ? null : Number(cost) } : {}),
@@ -458,6 +462,9 @@ function LotInfo({ lot, onSaved, onDelete }: { lot: Lot; onSaved: () => void; on
             </Field>
           )}
           <Field label={t('lots.purchase_date')}><Input disabled={!editable} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label={t('lots.expected_arrival_date')} hint={t('lots.expected_arrival_date_hint')}>
+            <Input disabled={!editable} type="date" value={expectedArrival} onChange={(e) => setExpectedArrival(e.target.value)} />
+          </Field>
           <Field label={t('lots.reference')}><Input disabled={!editable} value={reference} onChange={(e) => setReference(e.target.value)} /></Field>
           {can('costs.view') && <Field label={t('lots.total_cost', { currency: lot.currency })}><Input disabled={!editable || !can('costs.manage')} type="number" min={0} step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} /></Field>}
         </div>

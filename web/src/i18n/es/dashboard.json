@@ -7,7 +7,8 @@
     "pick_first": "Elige primero: {{name}}",
     "add_value_under": "Se agrega bajo la marca elegida: {{name}}.",
     "add_value_hint_child": "Se agrega a la lista de esa marca para todos los equipos. Luego puedes ajustar su nombre en Catálogos.",
-    "no_attributes": "Este tipo de equipo no tiene atributos configurados."
+    "no_attributes": "Este tipo de equipo no tiene atributos configurados.",
+    "add_another": "Agregar otro valor"
   },
   "dashboard": {
     "hello": "Hola, {{name}}",

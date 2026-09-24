@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useMeta, useReloadMeta, type Attribute, type Catalog, type CatalogItem, type Specs } from '../lib/meta';
@@ -118,7 +118,7 @@ export function SpecFields({ typeId, value, onChange, mode, disabled, only, opti
   const meta = useMeta();
   const { can } = useAuth();
   const { t } = useTranslation();
-  const [adding, setAdding] = useState<{ attr: Attribute; catalog: Catalog; parent: CatalogItem | null } | null>(null);
+  const [adding, setAdding] = useState<{ attr: Attribute; catalog: Catalog; parent: CatalogItem | null; index?: number } | null>(null);
   const listId = useId();
   const rows = meta.typeAttrs(typeId, { lotLine: mode === 'lot' }).filter((r) => !only || only(r.attr.key));
 
@@ -174,14 +174,39 @@ export function SpecFields({ typeId, value, onChange, mode, disabled, only, opti
               break;
             }
             case 'multiselect': {
+              // Cada fila es un valor elegido, con su propio selector; así se puede repetir el mismo valor más de una
+              // vez (p. ej. dos discos duros del mismo tamaño). La última fila siempre queda vacía, lista para agregar
+              // uno más; al elegir algo ahí se suma a la lista y aparece una fila vacía nueva debajo.
               const cat = meta.attrCatalog(typeId, attr);
               const cur = Array.isArray(v) ? (v as number[]) : [];
+              const mayAdd = !!cat && (cat.parentCatalogId ? QUICK_ADD_PERMS.some((p) => can(p)) : can('catalogs.manage'));
+              const entries: (number | null)[] = [...cur, null];
+              const updateEntry = (idx: number, newId: number | null) => {
+                const arr = [...cur];
+                if (idx < arr.length) { if (newId === null) arr.splice(idx, 1); else arr[idx] = newId; }
+                else if (newId !== null) arr.push(newId);
+                set(attr.key, arr);
+              };
               control = (
-                <div className="row wrap gap-sm">
-                  {(cat?.items ?? []).filter((i) => i.isActive || cur.includes(i.id)).map((i) => (
-                    <Checkbox key={i.id} disabled={disabled} checked={cur.includes(i.id)} label={meta.name(i.id)}
-                      onChange={(c) => set(attr.key, c ? [...cur, i.id] : cur.filter((x) => x !== i.id))} />
-                  ))}
+                <div className="stack sm">
+                  {entries.map((id, idx) => {
+                    const isNew = idx === cur.length;
+                    const opts = meta.attrOptions(typeId, attr, value, id ?? null);
+                    return (
+                      <div key={idx} className="row gap-sm">
+                        <Select disabled={disabled} value={id === null ? '' : String(id)} onChange={(e) => updateEntry(idx, e.target.value ? Number(e.target.value) : null)}>
+                          <option value="">{isNew ? `+ ${t('fields.add_another')}` : '—'}</option>
+                          {opts.map((o) => <option key={o.id} value={o.id}>{meta.name(o.id)}</option>)}
+                        </Select>
+                        {mayAdd && !disabled && (
+                          <button type="button" className="icon-btn" title={t('fields.add_value')} onClick={() => setAdding({ attr, catalog: cat!, parent: null, index: idx })}><Plus size={18} /></button>
+                        )}
+                        {!isNew && !disabled && (
+                          <button type="button" className="icon-btn" title={t('common.remove')} onClick={() => updateEntry(idx, null)}><X size={18} /></button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               );
               break;
@@ -201,7 +226,17 @@ export function SpecFields({ typeId, value, onChange, mode, disabled, only, opti
           return <Field key={attr.key} label={label} required={required}>{control}</Field>;
         })}
       </div>
-      {adding && <QuickAddItem attr={adding.attr} catalog={adding.catalog} parent={adding.parent} onClose={() => setAdding(null)} onCreated={(id) => set(adding.attr.key, id)} />}
+      {adding && (
+        <QuickAddItem attr={adding.attr} catalog={adding.catalog} parent={adding.parent} onClose={() => setAdding(null)}
+          onCreated={(id) => {
+            if (adding.index === undefined) { set(adding.attr.key, id); return; }
+            // Viene de una fila de "varios valores": lo pone en esa fila (la agrega si era la fila vacía del final).
+            const cur = Array.isArray(value[adding.attr.key]) ? [...(value[adding.attr.key] as number[])] : [];
+            if (adding.index < cur.length) cur[adding.index] = id; else cur.push(id);
+            set(adding.attr.key, cur);
+          }}
+        />
+      )}
     </>
   );
 }

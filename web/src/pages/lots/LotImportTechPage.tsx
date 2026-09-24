@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertTriangle, CheckCircle2, FileUp, Upload, XCircle } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useMeta, type Specs } from '../../lib/meta';
-import { Button, Card, PageHeader, useErr, useToast } from '../../components/ui';
+import { Button, Card, Checkbox, PageHeader, useErr, useToast } from '../../components/ui';
 import { SpecChips } from '../../components/fields';
 
 interface InspectLot { lote: string; reference: string | null; rowCount: number }
@@ -36,6 +36,7 @@ export default function LotImportTechPage() {
   const [previewing, setPreviewing] = useState(false);
   const [outcome, setOutcome] = useState<TechOutcome | null>(null);
   const [committing, setCommitting] = useState(false);
+  const [verifyOnTest, setVerifyOnTest] = useState(false);
 
   const typeIdByKey = useMemo(() => new Map(meta.data.equipmentTypes.map((t) => [t.key, t.id])), [meta]);
   const typeLabel = (key: string | undefined) => (key ? meta.typeName(typeIdByKey.get(key)) : '');
@@ -64,7 +65,7 @@ export default function LotImportTechPage() {
     setPreviewing(true);
     setOutcome(null);
     try {
-      const r = await api.post<TechOutcome>('/imports/tech/preview', { csv });
+      const r = await api.post<TechOutcome>('/imports/tech/preview', { csv, verifyOnTest });
       setOutcome(r);
     } catch (e) { toast.error(err(e)); } finally { setPreviewing(false); }
   }
@@ -73,7 +74,7 @@ export default function LotImportTechPage() {
     if (!csv) return;
     setCommitting(true);
     try {
-      const r = await api.post<TechOutcome>('/imports/tech/commit', { csv });
+      const r = await api.post<TechOutcome>('/imports/tech/commit', { csv, verifyOnTest });
       toast.success(t('lots.importTech.done', { n: r.created, lots: r.lots.length }));
       nav('/lots');
     } catch (e) { toast.error(err(e)); } finally { setCommitting(false); }
@@ -112,6 +113,10 @@ export default function LotImportTechPage() {
                 </tbody>
               </table>
             </div>
+            <div style={{ marginTop: 12 }}>
+              <Checkbox checked={verifyOnTest} onChange={setVerifyOnTest} label={t('lots.import.verify_on_test')} />
+              <div className="field-hint">{t('lots.import.verify_on_test_hint')}</div>
+            </div>
             <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
               <Button variant="primary" loading={previewing} onClick={runPreview}>{t('lots.import.preview_action')}</Button>
             </div>
@@ -122,6 +127,7 @@ export default function LotImportTechPage() {
           <Card title={t('lots.import.step3')}>
             <p>{t('lots.import.summary', { created: outcome.created, skipped: outcome.skipped, total: outcome.results.length })}</p>
             <p className="muted">{t('lots.importTech.lots_summary', { n: outcome.lots.length })}</p>
+            {verifyOnTest && <div className="alert alert-info" style={{ marginBottom: 12 }}>{t('lots.import.verify_on_test_summary')}</div>}
             {outcome.gradeWarnings > 0 && (
               <p className="row gap-sm" style={{ color: 'var(--warn, #d97706)' }}>
                 <AlertTriangle size={16} /> {t('lots.importTech.grade_warnings', { n: outcome.gradeWarnings })}

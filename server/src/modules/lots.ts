@@ -38,7 +38,7 @@ async function getLot(c: Ctx, id: number, forUpdate = false) {
 async function lotDetail(c: Ctx, id: number) {
   const lot = await c.db.opt<any>(
     `SELECT l.id, l.code, l.status_id AS "statusId", ci.system_key AS "statusKey", l.supplier_id AS "supplierId", s.name AS "supplierName",
-            l.purchase_date AS "purchaseDate", l.reference, l.currency, l.total_cost AS "totalCost", l.notes, l.requires_testing AS "requiresTesting",
+            l.purchase_date AS "purchaseDate", l.expected_arrival_date AS "expectedArrivalDate", l.reference, l.currency, l.total_cost AS "totalCost", l.notes, l.requires_testing AS "requiresTesting",
             l.counted_at AS "countedAt", l.closed_at AS "closedAt", l.created_at AS "createdAt"
        FROM lots l JOIN catalog_items ci ON ci.id = l.status_id LEFT JOIN suppliers s ON s.id = l.supplier_id WHERE l.id = $1`, [id]);
   if (!lot) throw notFound('lot_not_found');
@@ -104,7 +104,7 @@ export async function lotRoutes(app: FastifyInstance) {
     const total = (await c.db.one<{ n: number }>(`SELECT count(*)::int AS n ${from}`, p)).n;
     const items = await c.db.rows(
       `SELECT l.id, l.code, l.status_id AS "statusId", ci.system_key AS "statusKey", l.supplier_id AS "supplierId", s.name AS "supplierName",
-              l.purchase_date AS "purchaseDate", l.reference, l.created_at AS "createdAt", l.requires_testing AS "requiresTesting",
+              l.purchase_date AS "purchaseDate", l.expected_arrival_date AS "expectedArrivalDate", l.reference, l.created_at AS "createdAt", l.requires_testing AS "requiresTesting",
               (SELECT COALESCE(sum(expected_qty), 0) FROM lot_lines WHERE lot_id = l.id)::int AS expected,
               (SELECT COALESCE(sum(counted_qty), 0) FROM lot_lines WHERE lot_id = l.id)::int AS counted,
               (SELECT count(*) FROM lot_lines WHERE lot_id = l.id)::int AS lines,
@@ -123,6 +123,8 @@ export async function lotRoutes(app: FastifyInstance) {
     const b = c.body(z.object({
       supplierId: zId.nullish(),
       purchaseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      // Para un lote que todavía no llegó físicamente (recién comprado a un proveedor): para cuándo se espera. Solo informativa.
+      expectedArrivalDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
       reference: z.string().trim().max(100).nullish(),
       currency: z.string().length(3).toUpperCase().optional(),
       totalCost: z.number().min(0).nullish(),
@@ -138,9 +140,9 @@ export async function lotRoutes(app: FastifyInstance) {
     const status = await sysItemId(c.db, 'lot_status', 'open');
     const company = await c.db.one<{ currency: string }>('SELECT currency FROM companies WHERE id = $1', [c.companyId]);
     const lot = await c.db.one<{ id: number }>(
-      `INSERT INTO lots (company_id, code, supplier_id, status_id, purchase_date, reference, currency, total_cost, notes, requires_testing, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-      [c.companyId, code, b.supplierId ?? null, status, b.purchaseDate ?? date.toISOString().slice(0, 10), b.reference ?? null,
+      `INSERT INTO lots (company_id, code, supplier_id, status_id, purchase_date, expected_arrival_date, reference, currency, total_cost, notes, requires_testing, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+      [c.companyId, code, b.supplierId ?? null, status, b.purchaseDate ?? date.toISOString().slice(0, 10), b.expectedArrivalDate ?? null, b.reference ?? null,
         b.currency ?? company.currency, c.can('costs.manage') ? b.totalCost ?? null : null, b.notes ?? null, b.requiresTesting, c.userId]);
     let n = 1;
     const lineIds: { id: number; lineNo: number }[] = [];
@@ -161,6 +163,7 @@ export async function lotRoutes(app: FastifyInstance) {
     const b = c.body(z.object({
       supplierId: zId.nullable().optional(),
       purchaseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      expectedArrivalDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
       reference: z.string().trim().max(100).nullable().optional(),
       totalCost: z.number().min(0).nullable().optional(),
       notes: z.string().trim().max(1000).nullable().optional(),
@@ -173,12 +176,15 @@ export async function lotRoutes(app: FastifyInstance) {
     await c.db.query(
       `UPDATE lots SET supplier_id = CASE WHEN $2::boolean THEN $3 ELSE supplier_id END,
                        purchase_date = COALESCE($4::date, purchase_date),
-                       reference = CASE WHEN $5::boolean THEN $6 ELSE reference END,
-                       total_cost = CASE WHEN $7::boolean THEN $8 ELSE total_cost END,
-                       notes = CASE WHEN $9::boolean THEN $10 ELSE notes END,
-                       requires_testing = CASE WHEN $11::boolean THEN $12 ELSE requires_testing END
+                       expected_arrival_date = CASE WHEN $5::boolean THEN $6::date ELSE expected_arrival_date END,
+                       reference = CASE WHEN $7::boolean THEN $8 ELSE reference END,
+                       total_cost = CASE WHEN $9::boolean THEN $10 ELSE total_cost END,
+                       notes = CASE WHEN $11::boolean THEN $12 ELSE notes END,
+                       requires_testing = CASE WHEN $13::boolean THEN $14 ELSE requires_testing END
         WHERE id = $1`,
-      [id, b.supplierId !== undefined, b.supplierId ?? null, b.purchaseDate ?? null, b.reference !== undefined, b.reference ?? null,
+      [id, b.supplierId !== undefined, b.supplierId ?? null, b.purchaseDate ?? null,
+        b.expectedArrivalDate !== undefined, b.expectedArrivalDate ?? null,
+        b.reference !== undefined, b.reference ?? null,
         b.totalCost !== undefined, b.totalCost ?? null, b.notes !== undefined, b.notes ?? null,
         b.requiresTesting !== undefined, b.requiresTesting ?? null]);
     await c.audit('lot.updated', 'lot', id);

@@ -154,6 +154,7 @@ export const DATASETS: Dataset[] = [
       f('lot', 'status', 'Estado', 'Status', 'select', nm('st'), { idSql: 'st.id', join: 'st', options: 'catalog:lot_status' }),
       f('lot', 'supplier', 'Proveedor', 'Supplier', 'text', 'sp.name', { join: 'sp', perm: 'suppliers.view' }),
       f('lot', 'purchaseDate', 'Fecha de compra', 'Purchase date', 'date', 'lo.purchase_date'),
+      f('lot', 'expectedArrivalDate', 'Fecha de posible entrada', 'Expected arrival date', 'date', 'lo.expected_arrival_date'),
       f('lot', 'reference', 'Referencia', 'Reference', 'text', 'lo.reference'),
       f('lot', 'currency', 'Moneda', 'Currency', 'text', 'lo.currency::text'),
       f('lot', 'totalCost', 'Costo de la mercancía', 'Merchandise cost', 'money', 'lo.total_cost', { perm: 'costs.view' }),

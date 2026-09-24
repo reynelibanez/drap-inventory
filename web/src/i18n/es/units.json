@@ -6,6 +6,9 @@
     "serial_optional": "Opcional para este tipo de equipo",
     "cosmetic": "Grado cosmético",
     "functional": "Grado funcional",
+    "cosmetic_note": "Nota del grado cosmético",
+    "functional_note": "Nota del grado funcional",
+    "general_note_hint": "Cualquier otra observación del equipo (aparte de las notas de cada grado).",
     "not_sellable_hint": "Con este grado el equipo quedará como “No vendible”.",
     "save_draft": "Guardar borrador",
     "finish": "Terminar testeo"
@@ -102,11 +105,10 @@
     "edit": "Editar",
     "delete_available": "Eliminar (solo equipos disponibles)",
     "sold_locked": "Este equipo ya fue vendido y no se puede editar.",
-    "search_serial": "Buscar por número de serie",
-    "search_serial_hint": "Si el equipo ya existe en este lote (por ejemplo, viene de una importación con verificación) se abre con sus datos ya cargados, para revisar si coinciden. Si no existe, se abre un registro nuevo con esa serie.",
-    "search_serial_action": "Buscar",
-    "serial_not_found": "No hay ningún equipo con la serie “{{serial}}” en este lote: se abrió un registro nuevo con esa serie.",
-    "serial_no_access": "El equipo {{code}} ya está vendido y no se puede abrir."
+    "serial_no_access": "El equipo {{code}} ya está vendido y no se puede abrir.",
+    "serial_matched_import": "El equipo {{code}} ya venía en la importación de este lote: se cargaron sus datos declarados para terminar de testearlo.",
+    "printed_tooltip_one": "Impreso una vez, por {{name}} · {{date}}",
+    "printed_tooltip_other": "Impreso {{count}} veces · Última vez: {{name}}, {{date}}"
   },
   "units": {
     "title": "Inventario",

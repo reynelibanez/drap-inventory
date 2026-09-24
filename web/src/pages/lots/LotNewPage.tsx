@@ -24,6 +24,7 @@ export default function LotNewPage() {
   const suppliers = useQuery({ queryKey: ['suppliers', 'all'], queryFn: () => api.get<{ items: { id: number; name: string }[] }>('/suppliers?all=1'), enabled: can('suppliers.view') });
   const [supplierId, setSupplierId] = useState('');
   const [date, setDate] = useState(todayISO());
+  const [expectedArrival, setExpectedArrival] = useState('');
   const [reference, setReference] = useState('');
   const [cost, setCost] = useState('');
   const [notes, setNotes] = useState('');
@@ -39,7 +40,7 @@ export default function LotNewPage() {
     setBusy(true);
     try {
       const r = await api.post<{ id: number }>('/lots', {
-        supplierId: supplierId ? Number(supplierId) : null, purchaseDate: date, reference: reference || null,
+        supplierId: supplierId ? Number(supplierId) : null, purchaseDate: date, expectedArrivalDate: expectedArrival || null, reference: reference || null,
         ...(can('costs.manage') ? { totalCost: cost === '' ? null : Number(cost) } : {}), notes: notes || null, requiresTesting,
         lines: valid.map((l) => ({ equipmentTypeId: l.typeId, specs: l.specs, expectedQty: Math.max(0, Math.floor(Number(l.qty) || 0)), notes: l.notes || null })),
       });
@@ -63,6 +64,9 @@ export default function LotNewPage() {
               </Field>
             )}
             <Field label={t('lots.purchase_date')}><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+            <Field label={t('lots.expected_arrival_date')} hint={t('lots.expected_arrival_date_hint')}>
+              <Input type="date" value={expectedArrival} onChange={(e) => setExpectedArrival(e.target.value)} />
+            </Field>
             <Field label={t('lots.reference')} hint={t('lots.reference_hint')}><Input value={reference} onChange={(e) => setReference(e.target.value)} /></Field>
             {can('costs.manage') && <Field label={t('lots.total_cost', { currency: company?.currency })}><Input type="number" min={0} step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} /></Field>}
           </div>

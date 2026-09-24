@@ -135,8 +135,13 @@ function rowHasData(row: string[], cols: TechColumns): boolean {
  * tipo que indique su propia columna. Igual que la importación genérica, cada fila corre en su propio SAVEPOINT y
  * vista previa/confirmar comparten el mismo código (revierte con SAVEPOINT al final si es solo vista previa).
  */
-export async function performImportTech(c: Ctx, headers: string[], dataRows: string[][]): Promise<TechImportOutcome> {
+export async function performImportTech(c: Ctx, headers: string[], dataRows: string[][], opts: { verifyOnTest?: boolean } = {}): Promise<TechImportOutcome> {
   const cols = resolveTechColumns(headers);
+  // Igual que en la importación genérica: por defecto los equipos quedan disponibles de una, sin testeo. Si se pide
+  // verificar por número de serie, en cambio, cada lote creado entra a testeo y se guarda una foto de lo que decía
+  // el archivo (serie y datos técnicos) en unit_import_snapshots, para comparar después contra lo que confirme el
+  // técnico al terminar el testeo (ver los reportes "Verificación de importación").
+  const verifyOnTest = opts.verifyOnTest ?? false;
 
   const typeRows = await c.db.rows<{ id: number; key: string; is_active: boolean }>(
     `SELECT id, key, is_active FROM equipment_types WHERE key = ANY($1::text[])`, [['laptop', 'desktop', 'generic']]);
@@ -193,8 +198,8 @@ export async function performImportTech(c: Ctx, headers: string[], dataRows: str
     const lotCode = await nextLotCode(c.db, settings, g.date ?? today);
     const lot = await c.db.one<{ id: number }>(
       `INSERT INTO lots (company_id, code, status_id, purchase_date, reference, currency, requires_testing, counted_at, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,false,now(),$7) RETURNING id`,
-      [c.companyId, lotCode, lotStatus, (g.date ?? today).toISOString().slice(0, 10), g.ref ?? lote, company.currency, c.userId]);
+       VALUES ($1,$2,$3,$4,$5,$6,$7,now(),$8) RETURNING id`,
+      [c.companyId, lotCode, lotStatus, (g.date ?? today).toISOString().slice(0, 10), g.ref ?? lote, company.currency, verifyOnTest, c.userId]);
 
     let created = 0, skipped = 0;
     for (const { row, idx } of g.rows) {
@@ -291,9 +296,14 @@ export async function performImportTech(c: Ctx, headers: string[], dataRows: str
         const notes = noteParts.length ? noteParts.join(' | ').slice(0, 1000) : null;
 
         const u = await insertUnit(c, {
-          lotId: lot.id, lotCode, lineId: null, equipmentTypeId: type.id, specs: normSpecs, serial, notes, available: true,
+          lotId: lot.id, lotCode, lineId: null, equipmentTypeId: type.id, specs: normSpecs, serial, notes, available: !verifyOnTest,
           cosmeticGradeId, functionalGradeId,
         });
+        if (verifyOnTest) {
+          await c.db.query(
+            `INSERT INTO unit_import_snapshots (company_id, unit_id, lot_id, serial_number, specs, notes) VALUES ($1,$2,$3,$4,$5,$6)`,
+            [c.companyId, u.id, lot.id, serial, JSON.stringify(normSpecs), notes]);
+        }
         await c.db.query('RELEASE SAVEPOINT tech_import_row');
         created++; totalCreated++;
         results.push({ rowIndex: idx, ok: true, unitCode: u.code, serial, specs: normSpecs, notes, lotCode, equipmentTypeKey: typeKey });
@@ -305,7 +315,7 @@ export async function performImportTech(c: Ctx, headers: string[], dataRows: str
       }
     }
 
-    await c.audit('lot.imported', 'lot', lot.id, { code: lotCode, source: 'tech_csv', lote, created, skipped });
+    await c.audit('lot.imported', 'lot', lot.id, { code: lotCode, source: 'tech_csv', lote, created, skipped, verifyOnTest });
     lots.push({ lotId: lot.id, lotCode, lote, reference: g.ref ?? lote, created, skipped });
   }
 

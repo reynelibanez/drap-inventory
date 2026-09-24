@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Trash2, Upload } from 'lucide-react';
+import { Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -64,10 +64,18 @@ export default function LotsPage() {
     { key: 'inTesting', title: t('lots.in_testing_col'), type: 'number', width: 100, hidden: true },
     { key: 'createdAt', title: t('common.created'), type: 'datetime', hidden: true },
     {
-      key: '_actions', title: '', actions: true as const, width: 60,
-      render: (l) => (can('lots.delete') && l.deletable
-        ? <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} title={t('lots.delete_lot')} aria-label={t('lots.delete_lot')} onClick={(e) => { e.stopPropagation(); void remove(l); }} />
-        : null),
+      key: '_actions', title: '', actions: true as const, width: 90,
+      render: (l) => (
+        <>
+          {can('lots.edit') && (
+            <Button size="sm" variant="ghost" icon={<Pencil size={14} />} title={t('lots.edit_lot')} aria-label={t('lots.edit_lot')}
+              onClick={(e) => { e.stopPropagation(); nav(`/lots/${l.id}?tab=info`); }} />
+          )}
+          {can('lots.delete') && l.deletable && (
+            <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} title={t('lots.delete_lot')} aria-label={t('lots.delete_lot')} onClick={(e) => { e.stopPropagation(); void remove(l); }} />
+          )}
+        </>
+      ),
     },
   ];
 

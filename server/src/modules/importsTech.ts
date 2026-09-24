@@ -5,7 +5,7 @@ import { badRequest } from '../errors.js';
 import { parseCsv, IMPORT_MAX_ROWS } from '../services/csv.js';
 import { performImportTech, resolveTechColumns } from '../services/importerTech.js';
 
-const csvBody = z.object({ csv: z.string().min(1).max(1_800_000) });
+const csvBody = z.object({ csv: z.string().min(1).max(1_800_000), verifyOnTest: z.boolean().default(false) });
 
 function parseDataRows(csv: string): { headers: string[]; dataRows: string[][] } {
   const all = parseCsv(csv);
@@ -42,11 +42,11 @@ export async function importTechRoutes(app: FastifyInstance) {
 
   // Vista previa: igual que la importación genérica, corre todo de verdad y revierte al final (SAVEPOINT).
   app.post('/api/imports/tech/preview', route('lots.import', async (c) => {
-    const { csv } = c.body(csvBody);
+    const { csv, verifyOnTest } = c.body(csvBody);
     const { headers, dataRows } = parseDataRows(csv);
     await c.db.query('SAVEPOINT import_tech_preview');
     try {
-      const outcome = await performImportTech(c, headers, dataRows);
+      const outcome = await performImportTech(c, headers, dataRows, { verifyOnTest });
       return { ...outcome, preview: true };
     } finally {
       await c.db.query('ROLLBACK TO SAVEPOINT import_tech_preview');
@@ -55,9 +55,9 @@ export async function importTechRoutes(app: FastifyInstance) {
 
   // Confirmar: igual que la vista previa, pero queda guardado.
   app.post('/api/imports/tech/commit', route('lots.import', async (c) => {
-    const { csv } = c.body(csvBody);
+    const { csv, verifyOnTest } = c.body(csvBody);
     const { headers, dataRows } = parseDataRows(csv);
-    const outcome = await performImportTech(c, headers, dataRows);
+    const outcome = await performImportTech(c, headers, dataRows, { verifyOnTest });
     return { ...outcome, preview: false };
   }));
 }

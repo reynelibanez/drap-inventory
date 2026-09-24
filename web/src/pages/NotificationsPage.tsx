@@ -145,6 +145,7 @@ function DeviceCard() {
       const r = await enablePush();
       if (r === 'ok') toast.success(t('notif.enabled_ok'));
       else if (r === 'denied') toast.error(t('notif.denied_toast'));
+      else if (r === 'not_ready') toast.error(t('notif.not_ready_toast'));
       await reload();
     } catch (e) { toast.error(err(e)); } finally { setBusy(false); }
   }

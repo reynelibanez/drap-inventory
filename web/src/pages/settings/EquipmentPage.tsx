@@ -208,6 +208,7 @@ function AttrModal({ attr, onClose }: { attr?: Attribute; onClose: () => void })
   const reload = useReloadMeta();
   const err = useErr();
   const toast = useToast();
+  const confirm = useConfirm();
   const [label, setLabel] = useState<I18nText>(attr?.label ?? {});
   const [key, setKey] = useState('');
   const [dataType, setDataType] = useState<Attribute['dataType']>(attr?.dataType ?? 'text');
@@ -215,6 +216,7 @@ function AttrModal({ attr, onClose }: { attr?: Attribute; onClose: () => void })
   const [unit, setUnit] = useState(attr?.unit ?? '');
   const [active, setActive] = useState(attr?.isActive ?? true);
   const [busy, setBusy] = useState(false);
+  const [enabling, setEnabling] = useState(false);
   const isSel = dataType === 'select' || dataType === 'multiselect';
   async function save() {
     setBusy(true);
@@ -223,6 +225,18 @@ function AttrModal({ attr, onClose }: { attr?: Attribute; onClose: () => void })
       else await api.post('/attributes', { key: key || slug(label.es ?? label.en ?? ''), label: completeI18n(label), dataType, catalogId: isSel ? Number(catalogId) : null, unit: dataType === 'number' ? unit.trim() || null : null });
       await reload(); toast.success(t('common.saved')); onClose();
     } catch (e) { toast.error(err(e)); } finally { setBusy(false); }
+  }
+  /** Único cambio de tipo de dato permitido después de creado: de un solo valor a varios (p. ej. para poder cargar dos discos duros). No se pierde nada ya guardado. */
+  async function enableMultiple() {
+    if (!attr) return;
+    if (!(await confirm({ title: t('equipment.enable_multiple_title'), message: t('equipment.enable_multiple_confirm', { name: meta.label(attr.label) }) }))) return;
+    setEnabling(true);
+    try {
+      await api.post(`/attributes/${attr.id}/enable-multiple`, {});
+      await reload();
+      setDataType('multiselect');
+      toast.success(t('equipment.enable_multiple_done'));
+    } catch (e) { toast.error(err(e)); } finally { setEnabling(false); }
   }
   return (
     <Modal open onClose={onClose} size="md" title={attr ? t('equipment.edit_attr') : t('equipment.new_attr')}
@@ -235,6 +249,12 @@ function AttrModal({ attr, onClose }: { attr?: Attribute; onClose: () => void })
             {(['text', 'number', 'boolean', 'date', 'select', 'multiselect'] as const).map((d) => <option key={d} value={d}>{t(`equipment.datatype.${d}`)}</option>)}
           </Select>
         </Field>
+        {attr && dataType === 'select' && (
+          <div className="alert alert-info stack sm">
+            <span>{t('equipment.enable_multiple_hint')}</span>
+            <div><Button size="sm" loading={enabling} onClick={enableMultiple}>{t('equipment.enable_multiple_action')}</Button></div>
+          </div>
+        )}
         {isSel && (
           <Field label={t('equipment.catalog')} required>
             <Select value={catalogId} disabled={!!attr} onChange={(e) => setCatalogId(e.target.value)}>

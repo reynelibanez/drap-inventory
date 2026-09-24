@@ -12,6 +12,8 @@
     "code": "Lote",
     "supplier": "Proveedor",
     "purchase_date": "Fecha de compra",
+    "expected_arrival_date": "Fecha de posible entrada",
+    "expected_arrival_date_hint": "Si el lote todavía no llegó, para cuándo se espera. Opcional, se puede dejar en blanco.",
     "lines": "Líneas",
     "counted_vs_expected": "Contado / esperado",
     "units": "Equipos",
@@ -86,6 +88,7 @@
     "unlinked_units": "{{n}} equipo(s) de este lote no están asociados a ninguna línea (no coinciden con lo comprado).",
     "print_labels": "Imprimir etiquetas ({{n}})",
     "no_units": "Todavía no se ha registrado ningún equipo de este lote.",
+    "edit_lot": "Editar información del lote",
     "delete_lot": "Eliminar lote",
     "in_testing_col": "En testeo",
     "rep": {

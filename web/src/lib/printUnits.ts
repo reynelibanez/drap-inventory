@@ -22,6 +22,12 @@ export async function fetchLabelAssets(ids: number[]): Promise<LabelUnit[]> {
   }));
 }
 
+/** Registra que se mandó a imprimir la etiqueta de estos equipos (quién y cuándo). No es visible: no molesta si falla. */
+export async function logUnitPrints(ids: number[]): Promise<void> {
+  if (!ids.length) return;
+  try { await api.post('/units/print-log', { unitIds: ids }); } catch { /* no bloquea la impresión si falla */ }
+}
+
 /** Agrupa equipos por la plantilla que les toca (la de su tipo o la predeterminada) y devuelve un trabajo por plantilla. */
 export function groupByTemplate(units: LabelUnit[], templates: LabelTemplate[], overrides: Record<number, number> = {}) {
   const jobs = new Map<number, { template: LabelTemplate; units: LabelUnit[] }>();
@@ -42,5 +48,6 @@ export async function printUnitLabels(ids: number[], templates: LabelTemplate[],
     await printLabels({ template: job.template, units: list, ctx });
     n += list.length;
   }
+  void logUnitPrints(ids);
   return n;
 }

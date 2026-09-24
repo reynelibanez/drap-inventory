@@ -12,6 +12,8 @@
     "code": "Lot",
     "supplier": "Supplier",
     "purchase_date": "Purchase date",
+    "expected_arrival_date": "Expected arrival date",
+    "expected_arrival_date_hint": "If the lot hasn't arrived yet, when it's expected. Optional, can be left blank.",
     "lines": "Lines",
     "counted_vs_expected": "Counted / expected",
     "units": "Units",
@@ -86,6 +88,7 @@
     "unlinked_units": "{{n}} unit(s) of this lot are not linked to any line (they do not match what was purchased).",
     "print_labels": "Print labels ({{n}})",
     "no_units": "No units of this lot have been registered yet.",
+    "edit_lot": "Edit lot information",
     "delete_lot": "Delete lot",
     "in_testing_col": "In testing",
     "rep": {

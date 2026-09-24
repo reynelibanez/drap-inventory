@@ -3,22 +3,27 @@ import { useTranslation } from 'react-i18next';
 import { CheckCircle2, Zap } from 'lucide-react';
 import { api } from '../lib/api';
 import { useMeta, type Specs } from '../lib/meta';
-import { Button, Checkbox, Field, Input, Select, Textarea, useErr, useToast } from './ui';
+import { Button, Checkbox, Field, Input, Select, useErr, useToast } from './ui';
 import { CatalogSelect, SpecFields, TypeSelect, specsPatch } from './fields';
+import { NoteField } from './NoteField';
 import type { UnitData } from './UnitForm';
 
 /** Datos con los que arranca el formulario de un equipo nuevo. */
 export interface Draft {
   lotId: number | null; typeId: number | null; serial: string; specs: Specs;
   cosmeticGradeId: number | null; functionalGradeId: number | null; notes: string;
+  cosmeticGradeNote: string; functionalGradeNote: string;
 }
-export const emptyDraft = (lotId: number | null): Draft => ({ lotId, typeId: null, serial: '', specs: {}, cosmeticGradeId: null, functionalGradeId: null, notes: '' });
+export const emptyDraft = (lotId: number | null): Draft => ({
+  lotId, typeId: null, serial: '', specs: {}, cosmeticGradeId: null, functionalGradeId: null, notes: '', cosmeticGradeNote: '', functionalGradeNote: '',
+});
 
 /** "Repetir el último" (sin serie ni grados) o "Clonar" (sin serie; conserva grados y notas). */
 export function draftFromUnit(u: UnitData, opts: { keepGrades: boolean; lotId?: number | null }): Draft {
   return {
     lotId: opts.lotId ?? u.lotId, typeId: u.equipmentTypeId, serial: '', specs: { ...(u.specs ?? {}) },
     cosmeticGradeId: opts.keepGrades ? u.cosmeticGradeId : null, functionalGradeId: opts.keepGrades ? u.functionalGradeId : null, notes: u.notes ?? '',
+    cosmeticGradeNote: opts.keepGrades ? u.cosmeticGradeNote ?? '' : '', functionalGradeNote: opts.keepGrades ? u.functionalGradeNote ?? '' : '',
   };
 }
 
@@ -28,9 +33,16 @@ interface LotOption { id: number; code: string; supplierName: string | null; req
  * Formulario para registrar equipos nuevos en un lote. Pide el lote, el tipo y todos los datos; el equipo se crea al guardar
  * (como borrador en testeo) o al terminar el testeo (con sus grados). Para tipos sin serie se puede crear varios a la vez.
  */
-export function NewUnitForm({ seed, lots, title, onCancel, onCreated }: {
+export function NewUnitForm({ seed, lots, title, onCancel, onCreated, onSerialMatch }: {
   seed: Draft; lots: LotOption[]; title?: string; onCancel: () => void;
   onCreated: (units: UnitData[], finished: boolean, lotId: number) => void;
+  /**
+   * Si el lote se importó pidiendo verificación por número de serie, el equipo ya existe (creado por la
+   * importación, con los datos que decía el archivo) y hay que terminar de testearlo en vez de crear uno nuevo.
+   * Se llama al salir del campo de serie o al presionar Enter; si devuelve true, ese equipo ya existente se abrió
+   * en su lugar (este formulario se reemplaza) y no hay que seguir con el alta de un equipo nuevo.
+   */
+  onSerialMatch?: (serial: string) => boolean;
 }) {
   const { t } = useTranslation();
   const meta = useMeta();
@@ -42,6 +54,8 @@ export function NewUnitForm({ seed, lots, title, onCancel, onCreated }: {
   const [specs, setSpecs] = useState<Specs>(seed.specs);
   const [cos, setCos] = useState<number | null>(seed.cosmeticGradeId);
   const [fun, setFun] = useState<number | null>(seed.functionalGradeId);
+  const [cosNote, setCosNote] = useState(seed.cosmeticGradeNote);
+  const [funNote, setFunNote] = useState(seed.functionalGradeNote);
   const [notes, setNotes] = useState(seed.notes);
   const [qty, setQty] = useState('1');
   const [skipTest, setSkipTest] = useState(false);
@@ -109,10 +123,14 @@ export function NewUnitForm({ seed, lots, title, onCancel, onCreated }: {
           u = await api.post<UnitData>(`/units/${u.id}/finish-test`, {
             cosmeticGradeId: cos, functionalGradeId: fun, serialNumber: serial.trim() || null,
             specs: specsPatch(typeId, cleanSpecs, meta), notes: notes.trim() || null,
+            cosmeticGradeNote: cosNote.trim() || null, functionalGradeNote: funNote.trim() || null,
           });
         } else if (cos || fun) {
           // Guardar borrador conserva los grados ya elegidos.
-          u = await api.patch<UnitData>(`/units/${u.id}`, { cosmeticGradeId: cos, functionalGradeId: fun });
+          u = await api.patch<UnitData>(`/units/${u.id}`, {
+            cosmeticGradeId: cos, functionalGradeId: fun,
+            cosmeticGradeNote: cosNote.trim() || null, functionalGradeNote: funNote.trim() || null,
+          });
         }
         created = [u];
       } else {
@@ -122,12 +140,18 @@ export function NewUnitForm({ seed, lots, title, onCancel, onCreated }: {
         if (finish) {
           const done: UnitData[] = [];
           for (const u of created) {
-            done.push(await api.post<UnitData>(`/units/${u.id}/finish-test`, { cosmeticGradeId: cos, functionalGradeId: fun, specs: specsPatch(typeId, cleanSpecs, meta), notes: notes.trim() || null }));
+            done.push(await api.post<UnitData>(`/units/${u.id}/finish-test`, {
+              cosmeticGradeId: cos, functionalGradeId: fun, specs: specsPatch(typeId, cleanSpecs, meta), notes: notes.trim() || null,
+              cosmeticGradeNote: cosNote.trim() || null, functionalGradeNote: funNote.trim() || null,
+            }));
           }
           created = done;
         } else if (cos || fun) {
           const done: UnitData[] = [];
-          for (const u of created) done.push(await api.patch<UnitData>(`/units/${u.id}`, { cosmeticGradeId: cos, functionalGradeId: fun }));
+          for (const u of created) done.push(await api.patch<UnitData>(`/units/${u.id}`, {
+            cosmeticGradeId: cos, functionalGradeId: fun,
+            cosmeticGradeNote: cosNote.trim() || null, functionalGradeNote: funNote.trim() || null,
+          }));
           created = done;
         }
       }
@@ -156,7 +180,9 @@ export function NewUnitForm({ seed, lots, title, onCancel, onCreated }: {
         <Field label={t('common.type')} required><TypeSelect value={typeId} onChange={changeType} /></Field>
         {typeId && (type?.tracksSerial ? (
           <Field label={t('unitForm.serial')} hint={t('testing.serial_hint')} required>
-            <Input className="big-input" value={serial} autoFocus autoComplete="off" spellCheck={false} onChange={(e) => setSerial(e.target.value)} />
+            <Input className="big-input" value={serial} autoFocus autoComplete="off" spellCheck={false} onChange={(e) => setSerial(e.target.value)}
+              onBlur={() => { const s = serial.trim(); if (s) onSerialMatch?.(s); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const s = serial.trim(); if (s) onSerialMatch?.(s); } }} />
           </Field>
         ) : (
           <Field label={t('testing.qty')} hint={t('testing.qty_hint')}><Input type="number" min={1} max={500} value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
@@ -172,14 +198,20 @@ export function NewUnitForm({ seed, lots, title, onCancel, onCreated }: {
       {typeId && !skipTest && (
         <>
           <div className="grid grid-2">
-            <Field label={t('unitForm.cosmetic')}><CatalogSelect catalog="cosmetic_grade" withCode value={cos} onChange={setCos} /></Field>
-            <Field label={t('unitForm.functional')} hint={notSellable ? t('unitForm.not_sellable_hint') : undefined}><CatalogSelect catalog="functional_grade" withCode value={fun} onChange={setFun} /></Field>
+            <div className="stack sm">
+              <Field label={t('unitForm.cosmetic')}><CatalogSelect catalog="cosmetic_grade" withCode value={cos} onChange={setCos} /></Field>
+              <Field label={t('unitForm.cosmetic_note')}><NoteField field="cosmeticGradeNote" value={cosNote} onChange={setCosNote} rows={2} /></Field>
+            </div>
+            <div className="stack sm">
+              <Field label={t('unitForm.functional')} hint={notSellable ? t('unitForm.not_sellable_hint') : undefined}><CatalogSelect catalog="functional_grade" withCode value={fun} onChange={setFun} /></Field>
+              <Field label={t('unitForm.functional_note')}><NoteField field="functionalGradeNote" value={funNote} onChange={setFunNote} rows={2} /></Field>
+            </div>
           </div>
-          <Field label={t('common.notes')}><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+          <Field label={t('common.notes')} hint={t('unitForm.general_note_hint')}><NoteField field="notes" value={notes} onChange={setNotes} /></Field>
         </>
       )}
       {typeId && skipTest && (
-        <Field label={t('common.notes')}><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+        <Field label={t('common.notes')}><NoteField field="notes" value={notes} onChange={setNotes} /></Field>
       )}
       <div className="row form-actions" style={{ justifyContent: 'flex-end' }}>
         <Button variant="ghost" onClick={onCancel} disabled={!!busy}>{t('common.cancel')}</Button>

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, Copy, History, ListChecks, Pencil, Plus, Printer, ScanLine, Trash2 } from 'lucide-react';
+import { CheckCircle2, Copy, History, ListChecks, Pencil, Plus, Printer, Trash2 } from 'lucide-react';
 import { api, ApiError, qs } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useMeta } from '../../lib/meta';
-import { Badge, Button, Card, Checkbox, Empty, Field, Input, Modal, PageHeader, Progress, Select, Spinner, Tabs, Textarea, useConfirm, useErr, useToast } from '../../components/ui';
+import { Badge, Button, Card, Checkbox, Empty, Field, Modal, PageHeader, Progress, Select, Spinner, Tabs, useConfirm, useErr, useToast } from '../../components/ui';
 import { DataGrid, type GridColumn } from '../../components/grid/DataGrid';
 import { useUnitColumns, type UnitRow } from '../../components/UnitGrid';
 import { useAllRows } from '../../lib/useAllRows';
@@ -17,8 +17,10 @@ import { PlaceUnitsModal } from '../../components/PlaceUnitsModal';
 import { BottomSheet } from '../../components/mobile/BottomSheet';
 import { useIsMobile } from '../../lib/useIsMobile';
 import { PrintLabelsModal } from '../../components/PrintLabelsModal';
+import { NoteField } from '../../components/NoteField';
 import { useLabelCtx, useLabelTemplates } from '../../lib/useLabels';
 import { getAutoPrint, printUnitLabels, setAutoPrint } from '../../lib/printUnits';
+import { useFmt } from '../../lib/useFmt';
 
 interface LotRow { id: number; code: string; statusKey: string; supplierName: string | null; units: number; counted: number; inTesting: number; requiresTesting: boolean }
 interface LotDetail { id: number; code: string; statusKey: string; lines: { id: number; lineNo: number }[]; summary: { counted: number; units: number; unlinkedUnits: number; unitsByStatus: { statusId: number; n: number }[] } }
@@ -28,6 +30,7 @@ type Panel = { kind: 'draft'; seed: Draft; nonce: number; title: string } | { ki
 export default function TestingPage() {
   const { t } = useTranslation();
   const meta = useMeta();
+  const fmt = useFmt();
   const { can, company } = useAuth();
   const err = useErr();
   const toast = useToast();
@@ -45,7 +48,6 @@ export default function TestingPage() {
   const labelCtx = useLabelCtx();
   const [mineOnly, setMineOnly] = useState(false);
   const [view, setView] = useState<View>('all');
-  const [serialLookup, setSerialLookup] = useState('');
   const mobile = useIsMobile();
 
   const lots = useQuery({
@@ -124,30 +126,26 @@ export default function TestingPage() {
   };
 
   /**
-   * Busca por número de serie dentro del lote elegido. Si el equipo ya existe (por ejemplo, viene de una
-   * importación con verificación) lo abre con todos sus datos ya cargados, para revisar si coinciden con el
-   * equipo físico. Si no existe, abre un registro nuevo con esa serie ya puesta.
+   * Al registrar un equipo nuevo y escribir su número de serie: si ese serial ya existe en el lote (viene de una
+   * importación con verificación, con los datos que decía el archivo ya cargados) hay que terminar de testear
+   * ESE equipo en vez de crear uno nuevo (crearlo de nuevo fallaría igual, por serie repetida). Si no hay
+   * coincidencia, no hace nada y se sigue con el alta normal del equipo nuevo.
    */
-  function findBySerial() {
-    const serial = serialLookup.trim();
-    if (!serial || !lotId) return;
+  const onSerialMatch = (serial: string): boolean => {
     const match = allItems.find((u) => u.serialNumber && u.serialNumber.toLowerCase() === serial.toLowerCase());
-    if (match) {
-      if (!canOpen(match)) { toast.error(t('testing.serial_no_access', { code: match.code })); return; }
-      openUnit(match);
-    } else {
-      openDraft({ ...emptyDraft(defaultLot), serial }, t('testing.new_title'));
-      toast.info(t('testing.serial_not_found', { serial }));
-    }
-    setSerialLookup('');
-  }
+    if (!match) return false;
+    if (!canOpen(match)) { toast.error(t('testing.serial_no_access', { code: match.code })); return true; }
+    toast.info(t('testing.serial_matched_import', { code: match.code }));
+    openUnit(match);
+    return true;
+  };
 
   /** Al terminar el testeo imprime la etiqueta asociada al tipo de cada equipo (si está activado). */
   const autoPrintUnits = (ids: number[]) => {
     const tpls = (labelTpls.data ?? []).filter((x) => x.isActive);
     if (!autoPrint || !tpls.length || !ids.length) return;
     if (ids.some((id) => id < 0) || !navigator.onLine) { toast.info(t('sync.labels_later')); return; }   // aún sin código definitivo / sin conexión
-    printUnitLabels(ids, tpls, labelCtx).catch((e: unknown) => toast.error(err(e)));
+    printUnitLabels(ids, tpls, labelCtx).then(refresh).catch((e: unknown) => toast.error(err(e)));
   };
 
   /** Avisa dónde quedó cada equipo (ubicación automática). Los que no tienen espacio se ofrecen para ubicar a mano. */
@@ -193,7 +191,9 @@ export default function TestingPage() {
         <>
           {canOpen(u) && <Button size="sm" variant="ghost" icon={<Pencil size={14} />} title={t('testing.edit')} aria-label={t('testing.edit')} onClick={() => openUnit(u)} />}
           <Button size="sm" variant="ghost" icon={<Copy size={14} />} title={`${t('testing.clone')}: ${t('testing.clone_hint')}`} aria-label={t('testing.clone')} onClick={() => clone(u)} />
-          <Button size="sm" variant="ghost" icon={<Printer size={14} />} title={t('labels.print.title')} aria-label={t('labels.print.title')} onClick={() => setPrintIds([u.id])} />
+          <Button size="sm" variant="ghost" className={u.printCount > 0 ? 'btn-printed' : undefined} icon={<Printer size={14} />}
+            title={u.printCount > 0 ? t('testing.printed_tooltip', { count: u.printCount, name: u.lastPrintedByName, date: fmt.dateTime(u.lastPrintedAt!) }) : t('labels.print.title')}
+            aria-label={t('labels.print.title')} onClick={() => setPrintIds([u.id])} />
           {canDelete(u) && <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} title={u.statusKey === 'testing' ? t('testing.delete_draft') : t('testing.delete_available')} aria-label={t('common.delete')} onClick={() => void discard(u)} />}
         </>
       ),
@@ -236,19 +236,6 @@ export default function TestingPage() {
           {lotId && <Link to={`/lots/${lotId}`}>{t('testing.open_lot')}</Link>}
         </div>
         {testable.length === 0 && <div className="alert alert-info" style={{ marginTop: 12 }}>{t('testing.no_lots')}</div>}
-        {lotId && (
-          <div className="row wrap" style={{ marginTop: 12 }}>
-            <Field label={t('testing.search_serial')} hint={t('testing.search_serial_hint')} className="grow">
-              <div className="row gap-sm">
-                <Input className="big-input" value={serialLookup} autoComplete="off" spellCheck={false}
-                  placeholder={t('testing.serial_hint')}
-                  onChange={(e) => setSerialLookup(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); findBySerial(); } }} />
-                <Button icon={<ScanLine size={16} />} disabled={!serialLookup.trim()} onClick={findBySerial}>{t('testing.search_serial_action')}</Button>
-              </div>
-            </Field>
-          </div>
-        )}
       </Card>
 
       {panel && (mobile ? (
@@ -256,7 +243,7 @@ export default function TestingPage() {
         <BottomSheet open full onClose={() => setPanel(null)}
           title={panel.kind === 'draft' ? panel.title : active.data ? <span className="mono">{active.data.code}</span> : t('testing.unit_data')}>
           {panel.kind === 'draft' ? (
-            <NewUnitForm key={panel.nonce} seed={panel.seed} lots={testable} onCancel={() => setPanel(null)} onCreated={onCreated} />
+            <NewUnitForm key={panel.nonce} seed={panel.seed} lots={testable} onCancel={() => setPanel(null)} onCreated={onCreated} onSerialMatch={onSerialMatch} />
           ) : (
             <div className="stack">
               {active.data && (
@@ -275,7 +262,7 @@ export default function TestingPage() {
         <div id="test-panel" style={{ marginTop: 16, scrollMarginTop: 12 }}>
           {panel.kind === 'draft' ? (
             <Card title={panel.title}>
-              <NewUnitForm key={panel.nonce} seed={panel.seed} lots={testable} onCancel={() => setPanel(null)} onCreated={onCreated} />
+              <NewUnitForm key={panel.nonce} seed={panel.seed} lots={testable} onCancel={() => setPanel(null)} onCreated={onCreated} onSerialMatch={onSerialMatch} />
             </Card>
           ) : (
             <Card title={active.data ? <span className="row"><span className="mono">{active.data.code}</span>{active.data.statusKey === 'testing' ? <Badge tone="warn">{t('testing.in_testing_badge')}</Badge> : <StatusBadge id={active.data.statusId} />}</span> : t('testing.unit_data')}
@@ -313,7 +300,7 @@ export default function TestingPage() {
 
       {bulk && <BulkFinishModal ids={bulkIds} units={allItems} onClose={() => setBulk(false)}
         onDone={(results) => { setChecked(new Set()); refresh(); autoPrintUnits(results.map((r) => r.id)); placementFeedback(results); }} />}
-      {printIds && <PrintLabelsModal unitIds={printIds} onClose={() => setPrintIds(null)} />}
+      {printIds && <PrintLabelsModal unitIds={printIds} onClose={() => { setPrintIds(null); refresh(); }} />}
       {placeIds && <PlaceUnitsModal unitIds={placeIds} onClose={() => setPlaceIds(null)} />}
     </>
   );
@@ -324,6 +311,8 @@ function BulkFinishModal({ ids, units, onClose, onDone }: { ids: number[]; units
   const { t } = useTranslation();
   const [cos, setCos] = useState<number | null>(null);
   const [fun, setFun] = useState<number | null>(null);
+  const [cosNote, setCosNote] = useState('');
+  const [funNote, setFunNote] = useState('');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<{ code: string; msg: string }[]>([]);
@@ -335,7 +324,10 @@ function BulkFinishModal({ ids, units, onClose, onDone }: { ids: number[]; units
     for (const id of ids) {
       const u = units.find((x) => x.id === id);
       try {
-        const r = await api.post<UnitData>(`/units/${id}/finish-test`, { cosmeticGradeId: cos, functionalGradeId: fun, notes: notes.trim() || undefined });
+        const r = await api.post<UnitData>(`/units/${id}/finish-test`, {
+          cosmeticGradeId: cos, functionalGradeId: fun, notes: notes.trim() || undefined,
+          cosmeticGradeNote: cosNote.trim() || undefined, functionalGradeNote: funNote.trim() || undefined,
+        });
         ok.push({ id, code: r.code, slotId: r.slotId, autoPlaced: r.autoPlaced, pendingSync: (r as any).pendingSync });
       } catch (e) { bad.push({ code: u?.code ?? String(id), msg: err(e) }); }
     }
@@ -349,10 +341,16 @@ function BulkFinishModal({ ids, units, onClose, onDone }: { ids: number[]; units
       <div className="stack">
         <p className="muted">{t('testing.bulk_hint')}</p>
         <div className="grid grid-2">
-          <Field label={t('unitForm.cosmetic')} required><CatalogSelect catalog="cosmetic_grade" withCode value={cos} onChange={setCos} /></Field>
-          <Field label={t('unitForm.functional')} required><CatalogSelect catalog="functional_grade" withCode value={fun} onChange={setFun} /></Field>
+          <div className="stack sm">
+            <Field label={t('unitForm.cosmetic')} required><CatalogSelect catalog="cosmetic_grade" withCode value={cos} onChange={setCos} /></Field>
+            <Field label={t('unitForm.cosmetic_note')}><NoteField field="cosmeticGradeNote" value={cosNote} onChange={setCosNote} rows={2} /></Field>
+          </div>
+          <div className="stack sm">
+            <Field label={t('unitForm.functional')} required><CatalogSelect catalog="functional_grade" withCode value={fun} onChange={setFun} /></Field>
+            <Field label={t('unitForm.functional_note')}><NoteField field="functionalGradeNote" value={funNote} onChange={setFunNote} rows={2} /></Field>
+          </div>
         </div>
-        <Field label={t('common.notes')}><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+        <Field label={t('common.notes')} hint={t('unitForm.general_note_hint')}><NoteField field="notes" value={notes} onChange={setNotes} /></Field>
         {failed.length > 0 && (
           <div className="alert alert-bad"><div className="stack sm">
             <strong>{t('testing.bulk_failed', { count: failed.length })}</strong>

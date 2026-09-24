@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Printer } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useMeta } from '../lib/meta';
-import { fetchLabelAssets, fetchLabelUnits, groupByTemplate } from '../lib/printUnits';
+import { fetchLabelAssets, fetchLabelUnits, groupByTemplate, logUnitPrints } from '../lib/printUnits';
 import { printLabels } from '../lib/printLabels';
 import { templateForType } from '../lib/labels';
 import { useLabelCtx, useLabelTemplates } from '../lib/useLabels';
@@ -36,6 +36,7 @@ export function PrintLabelsModal({ unitIds, assets = false, onClose }: { unitIds
     setBusy(true);
     try {
       for (const job of jobs) await printLabels({ template: job.template, units: job.units.flatMap((u) => Array.from({ length: copies }, () => u)), ctx });
+      if (!assets) void logUnitPrints(unitIds);
       onClose();
     } catch (e) { toast.error(err(e)); } finally { setBusy(false); }
   }

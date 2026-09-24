@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { CheckCircle2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useMeta, type Specs } from '../lib/meta';
-import { Button, Field, Input, Textarea, useErr, useToast } from './ui';
+import { Button, Field, Input, useErr, useToast } from './ui';
 import { CatalogSelect, SpecFields, specsPatch } from './fields';
+import { NoteField } from './NoteField';
 
 export interface UnitData {
   id: number; code: string; equipmentTypeId: number; specs: Specs; serialNumber: string | null; notes: string | null;
@@ -15,6 +16,10 @@ export interface UnitData {
   /** Costo y precio de lista (vacíos si el usuario no tiene permiso para verlos). */
   cost?: number | null; costSource?: 'plan' | 'manual' | null; listPrice?: number | null; priceSource?: 'rule' | 'manual' | null;
   lotCurrency?: string;
+  /** Cuántas veces se mandó a imprimir su etiqueta, y quién/cuándo fue la última vez (0 / null si nunca). */
+  printCount: number; lastPrintedAt: string | null; lastPrintedByName: string | null;
+  /** Nota propia de cada grado (además de la nota general), p. ej. "rayón en la tapa" o "batería al 80%". */
+  cosmeticGradeNote: string | null; functionalGradeNote: string | null;
 }
 
 /**
@@ -32,6 +37,8 @@ export function UnitForm({ unit, mode, onSaved, onFinished }: { unit: UnitData; 
   const [specs, setSpecs] = useState<Specs>(unit.specs ?? {});
   const [cos, setCos] = useState<number | null>(unit.cosmeticGradeId);
   const [fun, setFun] = useState<number | null>(unit.functionalGradeId);
+  const [cosNote, setCosNote] = useState(unit.cosmeticGradeNote ?? '');
+  const [funNote, setFunNote] = useState(unit.functionalGradeNote ?? '');
   const [notes, setNotes] = useState(unit.notes ?? '');
   const [busy, setBusy] = useState<'save' | 'finish' | null>(null);
   const funItem = meta.item(fun);
@@ -44,6 +51,7 @@ export function UnitForm({ unit, mode, onSaved, onFinished }: { unit: UnitData; 
       const u = await api.patch<UnitData>(`/units/${unit.id}`, {
         serialNumber: serial.trim() || null, specs: specsPatch(unit.equipmentTypeId, specs, meta), notes: notes.trim() || null,
         cosmeticGradeId: cos, functionalGradeId: fun,
+        cosmeticGradeNote: cosNote.trim() || null, functionalGradeNote: funNote.trim() || null,
       });
       toast.success(t('common.saved'));
       onSaved(u);
@@ -57,6 +65,7 @@ export function UnitForm({ unit, mode, onSaved, onFinished }: { unit: UnitData; 
       const u = await api.post<UnitData>(`/units/${unit.id}/finish-test`, {
         cosmeticGradeId: cos, functionalGradeId: fun, serialNumber: serial.trim() || null,
         specs: specsPatch(unit.equipmentTypeId, specs, meta), notes: notes.trim() || null,
+        cosmeticGradeNote: cosNote.trim() || null, functionalGradeNote: funNote.trim() || null,
       });
       toast.success(t('unitForm.finished', { code: u.code }));
       onFinished?.(u);
@@ -72,12 +81,18 @@ export function UnitForm({ unit, mode, onSaved, onFinished }: { unit: UnitData; 
       </div>
       <SpecFields typeId={unit.equipmentTypeId} mode="unit" value={specs} onChange={setSpecs} disabled={locked} />
       <div className="grid grid-2">
-        <Field label={t('unitForm.cosmetic')} required={mode === 'test'}><CatalogSelect catalog="cosmetic_grade" withCode value={cos} onChange={setCos} disabled={locked} /></Field>
-        <Field label={t('unitForm.functional')} required={mode === 'test'} hint={notSellable ? t('unitForm.not_sellable_hint') : undefined}>
-          <CatalogSelect catalog="functional_grade" withCode value={fun} onChange={setFun} disabled={locked} />
-        </Field>
+        <div className="stack sm">
+          <Field label={t('unitForm.cosmetic')} required={mode === 'test'}><CatalogSelect catalog="cosmetic_grade" withCode value={cos} onChange={setCos} disabled={locked} /></Field>
+          <Field label={t('unitForm.cosmetic_note')}><NoteField field="cosmeticGradeNote" value={cosNote} onChange={setCosNote} disabled={locked} rows={2} /></Field>
+        </div>
+        <div className="stack sm">
+          <Field label={t('unitForm.functional')} required={mode === 'test'} hint={notSellable ? t('unitForm.not_sellable_hint') : undefined}>
+            <CatalogSelect catalog="functional_grade" withCode value={fun} onChange={setFun} disabled={locked} />
+          </Field>
+          <Field label={t('unitForm.functional_note')}><NoteField field="functionalGradeNote" value={funNote} onChange={setFunNote} disabled={locked} rows={2} /></Field>
+        </div>
       </div>
-      <Field label={t('common.notes')}><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} disabled={locked} /></Field>
+      <Field label={t('common.notes')} hint={t('unitForm.general_note_hint')}><NoteField field="notes" value={notes} onChange={setNotes} disabled={locked} /></Field>
       {!locked && (
         <div className="row form-actions" style={{ justifyContent: 'flex-end' }}>
           {mode === 'test' ? (

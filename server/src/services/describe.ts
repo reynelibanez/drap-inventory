@@ -40,12 +40,19 @@ export function describeSpecs(idx: LabelIndex, typeId: number, specs: Record<str
     const def = idx.attrs.get(ta.key);
     if (!def) continue;
     if (def.dataType === 'select') out.push(tr(idx.items.get(Number(v))?.name, lang));
-    else if (def.dataType === 'multiselect') out.push((v as number[]).map((id) => tr(idx.items.get(id)?.name, lang)).join('/'));
+    else if (def.dataType === 'multiselect') out.push(joinMultiselect(idx, v as number[], lang));
     else if (def.dataType === 'boolean') out.push(`${tr(def.label, lang)}: ${v ? (lang === 'es' ? 'Sí' : 'Yes') : 'No'}`);
     else if (def.dataType === 'number') out.push(`${v}${def.unit ? ' ' + def.unit : ''}`);
     else out.push(String(v));
   }
   return out.filter(Boolean);
+}
+
+/** "256GB SSD/1TB HDD"; si un valor se repite (dos discos del mismo tamaño) se muestra una vez con "×2". */
+function joinMultiselect(idx: LabelIndex, ids: number[], lang: AppLanguage): string {
+  const counts = new Map<number, number>();
+  for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return [...counts.entries()].map(([id, n]) => tr(idx.items.get(id)?.name, lang) + (n > 1 ? ` ×${n}` : '')).join('/');
 }
 
 export const typeName = (idx: LabelIndex, typeId: number, lang: AppLanguage) => tr(idx.types.get(typeId)?.name, lang);

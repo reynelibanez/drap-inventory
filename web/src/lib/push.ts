@@ -17,21 +17,35 @@ function keyBytes(b64url: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-async function registration(): Promise<ServiceWorkerRegistration> {
-  return navigator.serviceWorker.ready;
+/**
+ * `navigator.serviceWorker.ready` solo se resuelve cuando hay un service worker ACTIVO para esta página: si el
+ * registro nunca llegó a completarse (por ejemplo, la primera vez que se entra por HTTPS con un certificado
+ * propio, antes de que el navegador termine de confiar en él) esa promesa queda esperando para siempre, sin
+ * fallar. Un tope de tiempo evita que un service worker que nunca arranca deje algo sin efecto para siempre.
+ * `timeoutMs` es más corto para usos "de paso" (como cerrar sesión, donde lo importante es no trabar el flujo)
+ * y más largo para "Activar notificaciones", donde sí vale la pena esperar a que el service worker recién
+ * instalado (que primero debe descargar y guardar en caché toda la aplicación) termine de arrancar.
+ */
+async function registration(timeoutMs = 4000): Promise<ServiceWorkerRegistration | null> {
+  if (!('serviceWorker' in navigator)) return null;
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+  ]);
 }
 
-/** Suscripción de ESTE navegador (o null si no está activada). */
+/** Suscripción de ESTE navegador (o null si no está activada, o si el service worker no respondió a tiempo). */
 export async function currentSubscription(): Promise<PushSubscription | null> {
   if (!pushSupported()) return null;
-  return (await registration()).pushManager.getSubscription();
+  const reg = await registration();
+  return reg ? reg.pushManager.getSubscription() : null;
 }
 
 async function register(sub: PushSubscription): Promise<void> {
   await api.post('/push/subscribe', { ...sub.toJSON(), userAgent: navigator.userAgent.slice(0, 300) });
 }
 
-export type EnableResult = 'ok' | 'denied' | 'unsupported';
+export type EnableResult = 'ok' | 'denied' | 'unsupported' | 'not_ready';
 
 /** Pide permiso, suscribe este navegador y lo registra en el servidor. */
 export async function enablePush(): Promise<EnableResult> {
@@ -39,7 +53,10 @@ export async function enablePush(): Promise<EnableResult> {
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') return 'denied';
   const { publicKey } = await api.get<{ publicKey: string }>('/push/config');
-  const reg = await registration();
+  // Aquí sí vale la pena esperar más: es la primera vez que este navegador prepara todo lo necesario para
+  // recibir avisos, y eso puede tardar unos segundos (sobre todo justo después de instalar o actualizar la app).
+  const reg = await registration(15000);
+  if (!reg) return 'not_ready';   // el service worker no llegó a activarse a tiempo: puede funcionar si se reintenta
   let sub = await reg.pushManager.getSubscription();
   // Si el servidor cambió de claves, la suscripción vieja ya no sirve.
   const same = sub?.options.applicationServerKey && new Uint8Array(sub.options.applicationServerKey).join() === keyBytes(publicKey).join();

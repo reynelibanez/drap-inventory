@@ -91,7 +91,8 @@ export async function normalizeSpecs(
         if (!Array.isArray(raw)) throw bad('invalid_catalog_value', k);
         const ids = raw.map(Number);
         if (ids.some((n) => !Number.isInteger(n))) throw bad('invalid_catalog_value', k);
-        if (ids.length) out[k] = [...new Set(ids)];
+        // Se permite repetir un valor (p. ej. dos discos del mismo tamaño), así que no se eliminan duplicados.
+        if (ids.length) out[k] = ids;
         break;
       }
     }
@@ -102,9 +103,10 @@ export async function normalizeSpecs(
     const v = out[a.key];
     if (v === undefined || !a.catalogId) continue;
     const ids = Array.isArray(v) ? v : [v as number];
+    const uniqueIds = [...new Set(ids)]; // solo para comprobar que existen; el valor guardado conserva los repetidos
     const found = await db.rows<{ id: number; parent: number | null }>(
-      'SELECT id, parent_item_id AS parent FROM catalog_items WHERE catalog_id = $1 AND id = ANY($2::bigint[]) AND is_active', [a.catalogId, ids]);
-    if (found.length !== ids.length) throw bad('invalid_catalog_value', a.key);
+      'SELECT id, parent_item_id AS parent FROM catalog_items WHERE catalog_id = $1 AND id = ANY($2::bigint[]) AND is_active', [a.catalogId, uniqueIds]);
+    if (found.length !== uniqueIds.length) throw bad('invalid_catalog_value', a.key);
     // Una lista que depende de otra (modelo → marca): el valor debe ser de la marca elegida en este mismo equipo.
     const parentCatalog = (await db.opt<{ p: number | null }>('SELECT parent_catalog_id AS p FROM catalogs WHERE id = $1', [a.catalogId]))?.p;
     if (!parentCatalog) continue;

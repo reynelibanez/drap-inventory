@@ -34,6 +34,7 @@
     "enabled_ok": "Notifications turned on",
     "disabled_ok": "Notifications turned off on this device",
     "denied_toast": "The browser did not grant permission",
+    "not_ready_toast": "The browser was still preparing the app to receive alerts. Wait a few seconds and press “Turn on” again.",
     "test_sent": "Test sent to {{count}} device(s)",
     "test_none": "You have no devices with notifications turned on",
     "test_failed": "The test could not be delivered ({{failed}} of {{devices}} devices)",

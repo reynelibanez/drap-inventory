@@ -216,7 +216,12 @@ export class MetaIndex {
   specValue(attr: Attribute, v: any, withLabelForBool = false): string {
     switch (attr.dataType) {
       case 'select': return this.name(Number(v));
-      case 'multiselect': return (v as number[]).map((id) => this.name(id)).join(', ');
+      case 'multiselect': {
+        // Si un valor se repite (dos discos del mismo tamaño) se muestra una vez con "×2" en vez de dos veces seguidas.
+        const counts = new Map<number, number>();
+        for (const id of v as number[]) counts.set(id, (counts.get(id) ?? 0) + 1);
+        return [...counts.entries()].map(([id, n]) => this.name(id) + (n > 1 ? ` ×${n}` : '')).join(', ');
+      }
       case 'boolean': return withLabelForBool ? `${this.label(attr.label)}: ${v ? '✓' : '✗'}` : v ? '✓' : '✗';
       case 'number': return `${v}${attr.unit ? ' ' + attr.unit : ''}`;
       default: return String(v);

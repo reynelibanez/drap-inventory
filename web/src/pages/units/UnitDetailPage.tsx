@@ -103,6 +103,8 @@ export default function UnitDetailPage() {
                   return <FragmentRow key={attr.key} label={meta.label(attr.label)} value={v === undefined || v === null || v === '' ? null : meta.specValue(attr, v)} />;
                 })}
                 <dt>{t('units.grades')}</dt><dd><Grades cosmeticId={u.cosmeticGradeId} functionalId={u.functionalGradeId} /></dd>
+                {u.cosmeticGradeNote && <><dt>{t('unitForm.cosmetic_note')}</dt><dd className="pre">{u.cosmeticGradeNote}</dd></>}
+                {u.functionalGradeNote && <><dt>{t('unitForm.functional_note')}</dt><dd className="pre">{u.functionalGradeNote}</dd></>}
                 <dt>{t('units.location')}</dt><dd>{u.slotCode ? <span className="row gap-sm"><strong>{u.slotCode}</strong>{can('locations.assign') && !sold && <Button size="sm" variant="ghost" onClick={unplace}>{t('units.unassign')}</Button>}</span> : <span className="muted">{t('units.not_placed')}</span>}</dd>
                 {u.orderCode && <><dt>{t('units.order')}</dt><dd><Link to={`/orders/${u.orderId}`}>{u.orderCode}</Link></dd></>}
                 <dt>{t('units.tested_by')}</dt><dd>{t('shell.tech_number', { n: u.testerNumber })}{u.testedAt && ` · ${f.dateTime(u.testedAt)}`}</dd>

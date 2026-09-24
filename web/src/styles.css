@@ -139,6 +139,9 @@ code, .mono { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; f
 .btn-danger:hover:not(:disabled) { filter: brightness(0.92); }
 .btn-ghost { background: transparent; color: var(--text); }
 .btn-ghost:hover:not(:disabled) { background: var(--surface-2); }
+/* Marca visual de "ya se imprimió" (p. ej. el botón de imprimir etiqueta en Testeo). */
+.btn-printed { background: var(--good-soft); color: var(--good); }
+.btn-printed:hover:not(:disabled) { background: var(--good-soft); filter: brightness(0.95); }
 .icon-btn { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 6px; }
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
@@ -567,6 +570,9 @@ table.dg-table { table-layout: fixed; border-collapse: separate; border-spacing:
 .dg-op-g { display: inline-block; width: 22px; text-align: center; color: var(--muted); }
 .pop-hint { font-size: 12px; }
 .pop-links { font-size: 12px; }
+.note-field { position: relative; }
+.note-suggestion-item { width: 100%; display: block; text-align: left; border: 0; background: none; padding: 6px 10px; border-radius: 6px; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: pre-wrap; word-break: break-word; }
+.note-suggestion-item:hover { background: var(--surface-2); }
 .link-btn { border: 0; background: none; color: var(--primary); cursor: pointer; padding: 0; font: inherit; display: inline-flex; align-items: center; gap: 4px; }
 .link-btn:disabled { color: var(--muted); cursor: default; }
 .row-inactive { opacity: .55; }

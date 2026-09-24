@@ -151,6 +151,57 @@ describe('flujo completo de una empresa', () => {
     expect((await api.call('GET', '/api/units/lookup?code=SN-002', tokA)).body.id).toBe(u2);
   });
 
+  it('cada grado tiene su propia nota, aparte de la nota general', async () => {
+    const r = await api.call('POST', `/api/lots/${lotId}/units`, tokA, { equipmentTypeId: m.type('generic'), specs: { description: 'Cable HDMI' }, serialNumber: 'NOTE-1' });
+    const id = r.body.id;
+    const f = await api.call('POST', `/api/units/${id}/finish-test`, tokA, {
+      cosmeticGradeId: m.item('cosmetic_grade', 'A'), functionalGradeId: m.item('functional_grade', 'A'),
+      notes: 'nota general', cosmeticGradeNote: 'rayón en la tapa', functionalGradeNote: 'probado y funciona bien',
+    });
+    expect(f.status).toBe(200);
+    expect(f.body.notes).toBe('nota general');
+    expect(f.body.cosmeticGradeNote).toBe('rayón en la tapa');
+    expect(f.body.functionalGradeNote).toBe('probado y funciona bien');
+
+    // Se pueden editar (y borrar) por separado, sin tocar las demás.
+    const edit = await api.call('PATCH', `/api/units/${id}`, tokA, { cosmeticGradeNote: 'rayón menor, ya pulido' });
+    expect(edit.body.cosmeticGradeNote).toBe('rayón menor, ya pulido');
+    expect(edit.body.functionalGradeNote).toBe('probado y funciona bien'); // no se tocó
+    expect(edit.body.notes).toBe('nota general'); // no se tocó
+
+    const clear = await api.call('PATCH', `/api/units/${id}`, tokA, { functionalGradeNote: null });
+    expect(clear.body.functionalGradeNote).toBeNull();
+    await api.call('DELETE', `/api/units/${id}`, tokA);
+  });
+
+  it('sugiere notas ya usadas antes, sin duplicados y sin vacías', async () => {
+    const mk = async (serial: string, notes: string, cosmeticGradeNote: string) => {
+      const r = await api.call('POST', `/api/lots/${lotId}/units`, tokA, { equipmentTypeId: m.type('generic'), specs: { description: 'Cable HDMI' }, serialNumber: serial });
+      const id = r.body.id;
+      await api.call('POST', `/api/units/${id}/finish-test`, tokA, {
+        cosmeticGradeId: m.item('cosmetic_grade', 'A'), functionalGradeId: m.item('functional_grade', 'A'),
+        notes, cosmeticGradeNote,
+      });
+      return id;
+    };
+    const id1 = await mk('SUG-1', 'batería al 80%', 'rayón leve');
+    const id2 = await mk('SUG-2', 'batería al 80%', ''); // misma nota general repetida; sin nota cosmética
+
+    const notesSug = await api.call('GET', '/api/units/note-suggestions?field=notes', tokA);
+    expect(notesSug.status).toBe(200);
+    expect(notesSug.body.suggestions.filter((s: string) => s === 'batería al 80%')).toHaveLength(1); // sin duplicados
+
+    const cosSug = await api.call('GET', '/api/units/note-suggestions?field=cosmeticGradeNote', tokA);
+    expect(cosSug.body.suggestions).toContain('rayón leve');
+    expect(cosSug.body.suggestions).not.toContain(''); // nunca sugiere vacío
+
+    const bad = await api.call('GET', '/api/units/note-suggestions?field=bogus', tokA);
+    expect(bad.status).toBe(400);
+
+    await api.call('DELETE', `/api/units/${id1}`, tokA);
+    await api.call('DELETE', `/api/units/${id2}`, tokA);
+  });
+
   it('el lote no se cierra con equipos en testeo', async () => {
     const r4 = await api.call('POST', `/api/lots/${lotId}/units`, tokA, { equipmentTypeId: m.type('monitor'), specs: { brand: m.item('brand', 'LG') }, serialNumber: 'MON-1' });
     const close = await api.call('POST', `/api/lots/${lotId}/transition`, tokA, { action: 'close' });

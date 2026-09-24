@@ -222,78 +222,153 @@ export async function resolveRowSpecs(resolver: Resolver, attrs: AttrConf[], map
   }
 
   // ---- Procesador y generación ----
+  // (un equipo con más de un procesador es rarísimo, pero se admite igual si el atributo se configuró como "varios
+  // valores", por la misma razón que el resto: consistencia con cómo se resuelve cualquier otro atributo así.)
   let processorId: number | undefined;
   const procAttr = byKey.get('processor');
   const genAttr = byKey.get('generation');
+  const procIsMulti = procAttr?.dataType === 'multiselect';
+  const genIsMulti = genAttr?.dataType === 'multiselect';
   if (cpuCombo && procAttr?.catalogId) {
     const raw = get(mapping.attrs.processor);
-    const parsed = raw ? parseCpu(raw) : null;
-    if (parsed) {
-      processorId = await resolver.fuzzy(procAttr.catalogId, 'processor', null, parsed.family);
-      specs.processor = processorId;
-      if (parsed.skuName && genAttr?.catalogId) specs.generation = await resolver.fuzzy(genAttr.catalogId, 'generation', processorId, parsed.skuName);
+    if (raw && (procIsMulti || genIsMulti)) {
+      const procIds: number[] = []; const genIds: number[] = [];
+      for (const part of splitMulti(raw)) {
+        const parsed = parseCpu(part);
+        if (!parsed) continue;
+        const pid = await resolver.fuzzy(procAttr.catalogId, 'processor', null, parsed.family);
+        procIds.push(pid);
+        if (parsed.skuName && genAttr?.catalogId) genIds.push(await resolver.fuzzy(genAttr.catalogId, 'generation', pid, parsed.skuName));
+      }
+      if (procIds.length) { specs.processor = procIsMulti ? procIds : procIds[0]; processorId = procIds[0]; }
+      if (genIds.length) specs.generation = genIsMulti ? genIds : genIds[0];
+    } else {
+      const parsed = raw ? parseCpu(raw) : null;
+      if (parsed) {
+        processorId = await resolver.fuzzy(procAttr.catalogId, 'processor', null, parsed.family);
+        specs.processor = processorId;
+        if (parsed.skuName && genAttr?.catalogId) specs.generation = await resolver.fuzzy(genAttr.catalogId, 'generation', processorId, parsed.skuName);
+      }
     }
   } else {
     if (procAttr?.catalogId && mapping.attrs.processor != null) {
       const raw = get(mapping.attrs.processor);
-      if (raw) { processorId = await resolver.fuzzy(procAttr.catalogId, 'processor', null, raw); specs.processor = processorId; }
+      if (raw) {
+        if (procIsMulti) { const ids = await resolveMulti(resolver, procAttr.catalogId, 'processor', null, raw); if (ids.length) { specs.processor = ids; processorId = ids[0]; } }
+        else { processorId = await resolver.fuzzy(procAttr.catalogId, 'processor', null, raw); specs.processor = processorId; }
+      }
     }
     if (genAttr?.catalogId && mapping.attrs.generation != null) {
       const raw = get(mapping.attrs.generation);
-      if (raw) specs.generation = await resolver.fuzzy(genAttr.catalogId, 'generation', processorId ?? null, raw);
+      if (raw) {
+        if (genIsMulti) { const ids = await resolveMulti(resolver, genAttr.catalogId, 'generation', processorId ?? null, raw); if (ids.length) specs.generation = ids; }
+        else specs.generation = await resolver.fuzzy(genAttr.catalogId, 'generation', processorId ?? null, raw);
+      }
     }
   }
 
   // ---- Tipo y capacidad de disco ----
+  // Un equipo puede tener más de un disco (p. ej. una laptop con SSD + HDD): si "Tipo de disco" o "Capacidad de
+  // disco" se configuraron como "Lista (varios valores)", una celda como "256GB SSD, 1TB HDD" se separa en sus
+  // partes y cada una se resuelve por su cuenta, en el mismo orden para tipo y capacidad (así el disco N de una
+  // lista corresponde al disco N de la otra). Con un solo valor configurado, el comportamiento es igual que antes.
   const stTypeAttr = byKey.get('storage_type');
   const stSizeAttr = byKey.get('storage_size');
+  const stTypeIsMulti = stTypeAttr?.dataType === 'multiselect';
+  const stSizeIsMulti = stSizeAttr?.dataType === 'multiselect';
   if (storageCombo) {
     const raw = get(mapping.attrs.storage_type);
-    const parsed = raw ? parseStorage(raw) : null;
-    if (parsed) {
-      if (parsed.typeName && stTypeAttr?.catalogId) specs.storage_type = await resolver.fuzzy(stTypeAttr.catalogId, 'storage_type', null, parsed.typeName);
-      if (parsed.code && stSizeAttr?.catalogId) specs.storage_size = await resolver.exactNumeric(stSizeAttr.catalogId, 'storage_size', parsed.code, parsed.label!);
+    if (raw && (stTypeIsMulti || stSizeIsMulti)) {
+      const typeIds: number[] = []; const sizeIds: number[] = [];
+      for (const part of splitMulti(raw)) {
+        const parsed = parseStorage(part);
+        if (parsed.typeName && stTypeAttr?.catalogId) typeIds.push(await resolver.fuzzy(stTypeAttr.catalogId, 'storage_type', null, parsed.typeName));
+        if (parsed.code && stSizeAttr?.catalogId) sizeIds.push(await resolver.exactNumeric(stSizeAttr.catalogId, 'storage_size', parsed.code, parsed.label!));
+      }
+      if (typeIds.length) specs.storage_type = stTypeIsMulti ? typeIds : typeIds[0];
+      if (sizeIds.length) specs.storage_size = stSizeIsMulti ? sizeIds : sizeIds[0];
+    } else {
+      const parsed = raw ? parseStorage(raw) : null;
+      if (parsed) {
+        if (parsed.typeName && stTypeAttr?.catalogId) specs.storage_type = await resolver.fuzzy(stTypeAttr.catalogId, 'storage_type', null, parsed.typeName);
+        if (parsed.code && stSizeAttr?.catalogId) specs.storage_size = await resolver.exactNumeric(stSizeAttr.catalogId, 'storage_size', parsed.code, parsed.label!);
+      }
     }
   } else {
     if (stTypeAttr?.catalogId && mapping.attrs.storage_type != null) {
       const raw = get(mapping.attrs.storage_type);
-      if (raw) specs.storage_type = await resolver.fuzzy(stTypeAttr.catalogId, 'storage_type', null, raw);
+      if (raw) {
+        if (stTypeIsMulti) { const ids = await resolveMulti(resolver, stTypeAttr.catalogId, 'storage_type', null, raw); if (ids.length) specs.storage_type = ids; }
+        else specs.storage_type = await resolver.fuzzy(stTypeAttr.catalogId, 'storage_type', null, raw);
+      }
     }
     if (stSizeAttr?.catalogId && mapping.attrs.storage_size != null) {
       const raw = get(mapping.attrs.storage_size);
-      const n = raw ? parseNumberWithUnit(raw) : null;
-      if (n) specs.storage_size = await resolver.exactNumeric(stSizeAttr.catalogId, 'storage_size', n.code, n.label);
+      if (raw) {
+        if (stSizeIsMulti) {
+          const ids: number[] = [];
+          for (const part of splitMulti(raw)) { const n = parseNumberWithUnit(part); if (n) ids.push(await resolver.exactNumeric(stSizeAttr.catalogId, 'storage_size', n.code, n.label)); }
+          if (ids.length) specs.storage_size = ids;
+        } else {
+          const n = parseNumberWithUnit(raw);
+          if (n) specs.storage_size = await resolver.exactNumeric(stSizeAttr.catalogId, 'storage_size', n.code, n.label);
+        }
+      }
     }
   }
 
   // ---- RAM ----
+  // (p. ej. dos pentes de memoria de distinta capacidad: "8GB, 4GB")
   const ramAttr = byKey.get('ram');
   if (ramAttr?.catalogId && mapping.attrs.ram != null) {
     const raw = get(mapping.attrs.ram);
-    const m = raw ? /(\d+(?:\.\d+)?)/.exec(raw) : null;
-    if (m) { const v = Math.round(parseFloat(m[1])); specs.ram = await resolver.exactNumeric(ramAttr.catalogId, 'ram', String(v), `${v} GB`); }
+    if (raw) {
+      if (ramAttr.dataType === 'multiselect') {
+        const ids: number[] = [];
+        for (const part of splitMulti(raw)) { const m = /(\d+(?:\.\d+)?)/.exec(part); if (m) { const v = Math.round(parseFloat(m[1])); ids.push(await resolver.exactNumeric(ramAttr.catalogId, 'ram', String(v), `${v} GB`)); } }
+        if (ids.length) specs.ram = ids;
+      } else {
+        const m = /(\d+(?:\.\d+)?)/.exec(raw);
+        if (m) { const v = Math.round(parseFloat(m[1])); specs.ram = await resolver.exactNumeric(ramAttr.catalogId, 'ram', String(v), `${v} GB`); }
+      }
+    }
   }
 
   // ---- Pantalla ----
   const screenAttr = byKey.get('screen_size');
   if (screenAttr?.catalogId && mapping.attrs.screen_size != null) {
     const raw = get(mapping.attrs.screen_size);
-    const m = raw ? /(\d+(?:\.\d+)?)/.exec(raw) : null;
-    if (m) { const v = parseFloat(m[1]); specs.screen_size = await resolver.exactNumeric(screenAttr.catalogId, 'screen_size', String(v), `${v}"`); }
+    if (raw) {
+      if (screenAttr.dataType === 'multiselect') {
+        const ids: number[] = [];
+        for (const part of splitMulti(raw)) { const m = /(\d+(?:\.\d+)?)/.exec(part); if (m) { const v = parseFloat(m[1]); ids.push(await resolver.exactNumeric(screenAttr.catalogId, 'screen_size', String(v), `${v}"`)); } }
+        if (ids.length) specs.screen_size = ids;
+      } else {
+        const m = /(\d+(?:\.\d+)?)/.exec(raw);
+        if (m) { const v = parseFloat(m[1]); specs.screen_size = await resolver.exactNumeric(screenAttr.catalogId, 'screen_size', String(v), `${v}"`); }
+      }
+    }
   }
 
   // ---- Sistema operativo ----
+  // (p. ej. un equipo con arranque dual: "Windows 11 Pro, Ubuntu 22.04")
   const osAttr = byKey.get('os');
   if (osAttr?.catalogId && mapping.attrs.os != null) {
     const raw = get(mapping.attrs.os);
-    if (raw) specs.os = await resolver.fuzzy(osAttr.catalogId, 'os', null, normalizeOs(raw));
+    if (raw) {
+      if (osAttr.dataType === 'multiselect') { const ids = await resolveMulti(resolver, osAttr.catalogId, 'os', null, normalizeOs(raw)); if (ids.length) specs.os = ids; }
+      else specs.os = await resolver.fuzzy(osAttr.catalogId, 'os', null, normalizeOs(raw));
+    }
   }
 
   // ---- Estado de batería ----
   const battCondAttr = byKey.get('battery_condition');
   if (battCondAttr?.catalogId && mapping.attrs.battery_condition != null) {
     const raw = get(mapping.attrs.battery_condition);
-    if (raw) specs.battery_condition = await resolver.fuzzy(battCondAttr.catalogId, 'battery_condition', null, raw);
+    if (raw) {
+      if (battCondAttr.dataType === 'multiselect') { const ids = await resolveMulti(resolver, battCondAttr.catalogId, 'battery_condition', null, raw); if (ids.length) specs.battery_condition = ids; }
+      else specs.battery_condition = await resolver.fuzzy(battCondAttr.catalogId, 'battery_condition', null, raw);
+    }
   }
 
   // ---- Pantalla táctil / incluye cargador (booleanos) ----
@@ -313,13 +388,22 @@ export async function resolveRowSpecs(resolver: Resolver, attrs: AttrConf[], map
     if (m) specs.battery_health = parseFloat(m[1]);
   }
 
-  // ---- El resto de los atributos de texto configurados (resolución, velocidad, descripción...): tal cual vienen ----
+  // ---- El resto de los atributos configurados que no tienen un manejo especial arriba ----
+  // (a los de arriba —marca, modelo, procesador, generación, disco, RAM, pantalla, SO, batería— no hay que
+  // volver a tocarlos aquí ni siquiera cuando su bloque no encontró nada que guardar, p. ej. "NO RAM": si se
+  // reintentaran acá como si fueran un atributo cualquiera, el fuzzy-match los tomaría como texto libre y
+  // crearía un valor de catálogo inventado a partir de esa palabra.)
+  const handledElsewhere = new Set(['brand', 'model', 'processor', 'generation', 'storage_type', 'storage_size', 'ram', 'screen_size', 'os', 'battery_condition']);
   for (const a of attrs) {
-    if (a.dataType !== 'text' || specs[a.key] !== undefined) continue;
+    if (handledElsewhere.has(a.key) || specs[a.key] !== undefined) continue;
     const col = mapping.attrs[a.key];
     if (col == null) continue;
     const raw = get(col);
-    if (raw) specs[a.key] = raw;
+    if (!raw) continue;
+    if (a.dataType === 'text') specs[a.key] = raw;
+    // Atributo de catálogo propio (no es ninguno de los de arriba) con "Lista (varios valores)": misma separación por comas.
+    else if (a.dataType === 'multiselect' && a.catalogId) { const ids = await resolveMulti(resolver, a.catalogId, a.key, null, raw); if (ids.length) specs[a.key] = ids; }
+    else if (a.dataType === 'select' && a.catalogId) specs[a.key] = await resolver.fuzzy(a.catalogId, a.key, null, raw);
   }
 
   return specs;
@@ -340,6 +424,31 @@ export function buildNotes(headers: string[], mapping: ImportMapping, row: strin
 }
 
 export const cleanSerial = (s: string): string | null => { const v = cell(s); return v ? v.slice(0, 100) : null; };
+
+/**
+ * Separa un valor compuesto en sus partes, para atributos "Lista (varios valores)" que admiten más de un componente
+ * igual en el mismo equipo (p. ej. una celda "SSD 256GB, HDD 1TB" para un equipo con dos discos). Si el valor no
+ * tiene ningún separador (el caso normal, de un solo componente) devuelve un único elemento con el texto completo,
+ * así que aplicarlo a un atributo de un solo valor no cambia nada.
+ */
+export function splitMulti(raw: string): string[] {
+  return raw.split(/\s*(?:,|\/|\+|;| y | and )\s*/i).map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Resuelve el valor de un atributo de catálogo (select) a partir de una celda del CSV, respetando si el atributo
+ * admite un solo valor o varios ("Lista (varios valores)"): con varios, separa la celda en partes y resuelve cada
+ * una por su cuenta (p. ej. tipo y capacidad de cada disco, en el mismo orden) en vez de tratar la celda entera
+ * como un solo valor.
+ */
+async function resolveMulti(
+  resolver: Resolver, catalogId: number, attrKey: string, parentItemId: number | null, raw: string,
+): Promise<number[]> {
+  const ids: number[] = [];
+  // No se eliminan duplicados: dos discos del mismo tamaño ("256GB SSD, 256GB SSD") deben quedar como dos valores.
+  for (const part of splitMulti(raw)) ids.push(await resolver.fuzzy(catalogId, attrKey, parentItemId, part));
+  return ids;
+}
 
 /**
  * Cuenta cuántas de las columnas usadas en el mapeo tienen de verdad algo escrito en esta fila. Un renglón sobrante

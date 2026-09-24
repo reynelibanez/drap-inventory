@@ -279,6 +279,31 @@ export async function catalogRoutes(app: FastifyInstance) {
     return { ok: true };
   }));
 
+  /**
+   * Único cambio de tipo de dato permitido después de creado: de "un solo valor" (select) a "varios valores"
+   * (multiselect) — p. ej. para poder cargar dos discos duros en el mismo equipo. Es seguro porque no se pierde
+   * nada: cada valor ya guardado (un solo id de catálogo) pasa a ser una lista de un solo elemento, y desde ese
+   * momento se puede elegir más de uno. El cambio inverso no se ofrece porque sí sería destructivo (una lista de
+   * varios valores no se puede reducir a uno solo sin perder datos).
+   */
+  app.post('/api/attributes/:id/enable-multiple', route('equipment.manage', async (c) => {
+    const { id } = c.params(zIdParam);
+    const attr = await c.db.opt<{ dataType: string; key: string }>('SELECT data_type AS "dataType", key FROM attribute_definitions WHERE id = $1', [id]);
+    if (!attr) throw notFound();
+    if (attr.dataType !== 'select') throw badRequest('not_a_single_value_attribute');
+    // Cada valor guardado como número suelto (un id de catálogo) pasa a ser un arreglo de un solo elemento, en
+    // todas las tablas donde puede haber quedado guardado (equipos, líneas de lote, activos, líneas de pedido y
+    // las fotos de importaciones con verificación), para que sigan comparando igual que antes.
+    for (const table of ['units', 'lot_lines', 'assets', 'order_lines', 'unit_import_snapshots']) {
+      await c.db.query(
+        `UPDATE ${table} SET specs = jsonb_set(specs, ARRAY[$2::text], to_jsonb(ARRAY[(specs->>$2)::bigint]))
+          WHERE company_id = $1 AND jsonb_typeof(specs -> $2) = 'number'`, [c.companyId, attr.key]);
+    }
+    await c.db.query(`UPDATE attribute_definitions SET data_type = 'multiselect' WHERE id = $1`, [id]);
+    await c.audit('attribute.enabled_multiple', 'attribute', id, { key: attr.key });
+    return { ok: true };
+  }));
+
   // ------------------------------------------------------------------
   // Tipos de equipo
   // ------------------------------------------------------------------
