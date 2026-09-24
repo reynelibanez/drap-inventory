@@ -21,8 +21,8 @@ if %NODEMAJOR% LSS 20 (
   exit /b 1
 )
 
-echo [1/5] Configurando la conexion a PostgreSQL...
-node scripts\setup-env.mjs
+echo [1/5] Configurando la conexion a la base de datos...
+node scripts\setup-env.mjs --no-db-setup
 if errorlevel 1 goto :fail
 
 echo [2/5] Instalando dependencias (puede tardar unos minutos)...

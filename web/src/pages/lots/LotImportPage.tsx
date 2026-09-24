@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { CheckCircle2, FileUp, Upload, XCircle } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useMeta, type Specs } from '../../lib/meta';
-import { Button, Card, Field, Input, PageHeader, Select, useErr, useToast } from '../../components/ui';
+import { Button, Card, Checkbox, Field, Input, PageHeader, Select, useErr, useToast } from '../../components/ui';
 import { SpecChips, TypeSelect } from '../../components/fields';
 
 interface ImportMapping {
@@ -87,6 +87,7 @@ export default function LotImportPage() {
   const [fileName, setFileName] = useState('');
   const [csv, setCsv] = useState('');
   const [lotReference, setLotReference] = useState('');
+  const [verifyOnTest, setVerifyOnTest] = useState(false);
   const [inspecting, setInspecting] = useState(false);
   const [inspected, setInspected] = useState<InspectResult | null>(null);
   const [mapping, setMapping] = useState<ImportMapping | null>(null);
@@ -119,6 +120,8 @@ export default function LotImportPage() {
     } catch (e) { toast.error(err(e)); } finally { setInspecting(false); }
   }
 
+  const effectiveVerify = verifyOnTest && mapping?.serialCol !== null && mapping?.serialCol !== undefined;
+
   const usedCols = useMemo(() => {
     if (!mapping) return new Set<number>();
     const s = new Set<number>();
@@ -146,7 +149,7 @@ export default function LotImportPage() {
     setPreviewing(true);
     setOutcome(null);
     try {
-      const r = await api.post<ImportOutcome>('/imports/preview', { equipmentTypeId: typeId, csv, mapping, lotReference: lotReference || null });
+      const r = await api.post<ImportOutcome>('/imports/preview', { equipmentTypeId: typeId, csv, mapping, lotReference: lotReference || null, verifyOnTest: effectiveVerify });
       setOutcome(r);
     } catch (e) { toast.error(err(e)); } finally { setPreviewing(false); }
   }
@@ -155,7 +158,7 @@ export default function LotImportPage() {
     if (!typeId || !mapping) return;
     setCommitting(true);
     try {
-      const r = await api.post<ImportOutcome>('/imports/commit', { equipmentTypeId: typeId, csv, mapping, lotReference: lotReference || null });
+      const r = await api.post<ImportOutcome>('/imports/commit', { equipmentTypeId: typeId, csv, mapping, lotReference: lotReference || null, verifyOnTest: effectiveVerify });
       toast.success(t('lots.import.done', { n: r.created }));
       nav(`/lots/${r.lotId}`);
     } catch (e) { toast.error(err(e)); } finally { setCommitting(false); }
@@ -224,6 +227,15 @@ export default function LotImportPage() {
               </table>
             </div>
 
+            <div style={{ marginTop: 12 }}>
+              <Checkbox checked={verifyOnTest} disabled={mapping.serialCol === null}
+                onChange={(v) => setVerifyOnTest(mapping.serialCol === null ? false : v)}
+                label={t('lots.import.verify_on_test')} />
+              <div className="field-hint">
+                {mapping.serialCol === null ? t('lots.import.verify_on_test_needs_serial') : t('lots.import.verify_on_test_hint')}
+              </div>
+            </div>
+
             {inspected.headers.some((_, i) => !usedCols.has(i)) && (
               <>
                 <h4>{t('lots.import.extra_cols')}</h4>
@@ -253,6 +265,7 @@ export default function LotImportPage() {
             <p>
               {t('lots.import.summary', { created: outcome.created, skipped: outcome.skipped, total: outcome.results.length })}
             </p>
+            {effectiveVerify && <div className="alert alert-info" style={{ marginBottom: 12 }}>{t('lots.import.verify_on_test_summary')}</div>}
             {outcome.newCatalogItems.length > 0 && (
               <div style={{ marginBottom: 12 }}>
                 <strong>{t('lots.import.new_values', { n: outcome.newCatalogItems.length })}</strong>

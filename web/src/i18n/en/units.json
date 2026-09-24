@@ -101,7 +101,12 @@
     "tested_at": "Tested on",
     "edit": "Edit",
     "delete_available": "Delete (available units only)",
-    "sold_locked": "This unit has already been sold and cannot be edited."
+    "sold_locked": "This unit has already been sold and cannot be edited.",
+    "search_serial": "Search by serial number",
+    "search_serial_hint": "If the unit already exists in this lot (for example, from an import with verification) it opens with its data already loaded, so you can check whether it matches. If it doesn't exist, a new record opens with that serial.",
+    "search_serial_action": "Search",
+    "serial_not_found": "No unit with serial “{{serial}}” in this lot: a new record was opened with that serial.",
+    "serial_no_access": "Unit {{code}} has already been sold and can't be opened."
   },
   "units": {
     "title": "Inventory",

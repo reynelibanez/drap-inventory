@@ -55,6 +55,18 @@ export const SYSTEM_REPORTS: SysReport[] = [
       [], [{ col: 0, dir: 'desc' }, { col: 1, dir: 'asc' }]),
   },
   {
+    key: 'lots_import_verification', dataset: 'lots', name: 'Lotes importados: verificación por serie', description: 'De los lotes importados pidiendo verificación por número de serie, cuántos equipos llegaron tal cual el archivo y cuántos tuvieron diferencias al testearlos.',
+    def: () => detail(
+      [col('code'), col('status'), col('purchaseDate'), col('importVerified'), col('importMatched'), col('importDiffering')],
+      [{ field: 'importVerified', op: 'gt', a: '0' }], [{ col: 2, dir: 'desc' }]),
+  },
+  {
+    key: 'import_verification_detail', dataset: 'units', name: 'Verificación de importación: detalle por equipo', description: 'Equipos que vinieron de una importación con verificación, comparados por número de serie contra lo que decía el archivo: cuáles llegaron igual y cuáles con diferencias.',
+    def: () => detail(
+      [col('code'), col('lotCode'), col('serial'), col('type'), col('status'), col('matchesImportDeclared'), col('testedAt')],
+      [{ field: 'hasImportSnapshot', op: 'is', a: 'true' }], [{ col: 6, dir: 'desc' }]),
+  },
+  {
     key: 'orders_open', dataset: 'orders', name: 'Pedidos abiertos', description: 'Pedidos en curso con cliente, vendedor, vencimiento de la reserva y avance.',
     def: (i) => detail(
       [col('code'), col('customer'), col('seller'), col('createdAt'), col('reservedUntil'), col('requested'), col('units')],

@@ -159,8 +159,8 @@ if exist "%~dp0runtime\\pgsql\\bin\\pg_ctl.exe" (
   "%NODE%" scripts\\local-pg.mjs start
   if errorlevel 1 goto :fail
 ) else (
-  echo [1/4] Configurando la conexion a PostgreSQL...
-  "%NODE%" scripts\\setup-env.mjs
+  echo [1/4] Configurando la conexion a la base de datos...
+  "%NODE%" scripts\\setup-env.mjs --no-db-setup
   if errorlevel 1 goto :fail
 )
 
@@ -309,8 +309,8 @@ if [ -x runtime/pgsql/bin/pg_ctl ]; then
   node scripts/local-pg.mjs start
   trap 'node scripts/local-pg.mjs stop' EXIT
 else
-  echo "[1/4] Configurando la conexion a PostgreSQL..."
-  node scripts/setup-env.mjs
+  echo "[1/4] Configurando la conexion a la base de datos..."
+  node scripts/setup-env.mjs --no-db-setup
 fi
 if [ -d node_modules/fastify ]; then echo "[2/4] Dependencias ya incluidas en el paquete."; else
   echo "[2/4] Instalando dependencias (necesita internet)..."; npm install --omit=dev --no-audit --no-fund; fi

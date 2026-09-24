@@ -101,7 +101,12 @@
     "tested_at": "Testeado el",
     "edit": "Editar",
     "delete_available": "Eliminar (solo equipos disponibles)",
-    "sold_locked": "Este equipo ya fue vendido y no se puede editar."
+    "sold_locked": "Este equipo ya fue vendido y no se puede editar.",
+    "search_serial": "Buscar por número de serie",
+    "search_serial_hint": "Si el equipo ya existe en este lote (por ejemplo, viene de una importación con verificación) se abre con sus datos ya cargados, para revisar si coinciden. Si no existe, se abre un registro nuevo con esa serie.",
+    "search_serial_action": "Buscar",
+    "serial_not_found": "No hay ningún equipo con la serie “{{serial}}” en este lote: se abrió un registro nuevo con esa serie.",
+    "serial_no_access": "El equipo {{code}} ya está vendido y no se puede abrir."
   },
   "units": {
     "title": "Inventario",

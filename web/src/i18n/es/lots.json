@@ -98,7 +98,7 @@
     "delete_only_empty": "Un lote cerrado no se puede eliminar. Reábrelo primero si necesitas borrarlo.",
     "import": {
       "title": "Importar equipos",
-      "subtitle": "Carga muchos equipos de una vez desde un archivo CSV (por ejemplo, un inventario en Excel guardado como CSV). Quedan disponibles de inmediato, sin pasar por testeo, dentro de un lote nuevo.",
+      "subtitle": "Carga muchos equipos de una vez desde un archivo CSV (por ejemplo, un inventario en Excel guardado como CSV), dentro de un lote nuevo. Por defecto quedan disponibles de inmediato, sin pasar por testeo; también puedes pedir que pasen por testeo para verificarlos contra el archivo (ver el paso 2).",
       "step1": "1. Archivo",
       "step2": "2. Columnas",
       "step3": "3. Vista previa",
@@ -122,7 +122,11 @@
       "summary": "{{created}} de {{total}} equipo(s) se crearán · {{skipped}} se omitirán",
       "new_values": "{{n}} valor(es) nuevo(s) se agregarán a los catálogos",
       "commit_action": "Confirmar importación",
-      "done": "Se importaron {{n}} equipo(s)"
+      "done": "Se importaron {{n}} equipo(s)",
+      "verify_on_test": "Enviar a testeo para verificar por número de serie",
+      "verify_on_test_hint": "Cada equipo entra a testeo (en vez de quedar disponible de una). Al escribir su número de serie en el testeo se le cargan automáticamente los datos que traía el archivo, para revisar si coinciden con el equipo físico; si no coinciden, se corrigen ahí mismo. Los reportes de lotes y de equipos permiten ver después cuáles llegaron tal cual el archivo y cuáles no.",
+      "verify_on_test_needs_serial": "Para poder verificar, primero elige qué columna del archivo trae el número de serie.",
+      "verify_on_test_summary": "Los equipos quedaron en testeo, no disponibles: al escribir su número de serie ahí se les cargan los datos del archivo para revisarlos."
     },
     "importTech": {
       "title": "Importar equipos (control técnico)",

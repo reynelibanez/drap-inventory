@@ -18,6 +18,9 @@ const importBody = z.object({
   csv: z.string().min(1).max(1_800_000),
   mapping: mappingSchema,
   lotReference: z.string().trim().max(100).nullish(),
+  // Si se activa, los equipos entran a testeo en vez de quedar disponibles de una, y se guarda lo que decía el
+  // archivo (serie y datos técnicos) para comparar después contra lo que el técnico confirme al testear.
+  verifyOnTest: z.boolean().default(false),
 });
 
 function parseDataRows(csv: string): { headers: string[]; dataRows: string[][] } {
@@ -46,7 +49,7 @@ export async function importRoutes(app: FastifyInstance) {
     const { headers, dataRows } = parseDataRows(b.csv);
     await c.db.query('SAVEPOINT import_preview');
     try {
-      const outcome = await performImport(c, { equipmentTypeId: b.equipmentTypeId, headers, dataRows, mapping: b.mapping, lotReference: b.lotReference ?? null });
+      const outcome = await performImport(c, { equipmentTypeId: b.equipmentTypeId, headers, dataRows, mapping: b.mapping, lotReference: b.lotReference ?? null, verifyOnTest: b.verifyOnTest });
       return { ...outcome, preview: true };
     } finally {
       await c.db.query('ROLLBACK TO SAVEPOINT import_preview');
@@ -57,7 +60,7 @@ export async function importRoutes(app: FastifyInstance) {
   app.post('/api/imports/commit', route('lots.import', async (c) => {
     const b = c.body(importBody);
     const { headers, dataRows } = parseDataRows(b.csv);
-    const outcome = await performImport(c, { equipmentTypeId: b.equipmentTypeId, headers, dataRows, mapping: b.mapping, lotReference: b.lotReference ?? null });
+    const outcome = await performImport(c, { equipmentTypeId: b.equipmentTypeId, headers, dataRows, mapping: b.mapping, lotReference: b.lotReference ?? null, verifyOnTest: b.verifyOnTest });
     return { ...outcome, preview: false };
   }));
 }

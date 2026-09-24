@@ -54,8 +54,8 @@ export const config = {
     port: Number(env('DB_PORT', '5432')),
     database: env('DB_NAME', 'refurbiz'),
     /** Usuario con el que corre la app (SIN privilegios de superusuario, para que RLS aplique). */
-    appUser: env('DB_APP_USER', 'refurbiz_app'),
-    appPassword: env('DB_APP_PASSWORD', 'refurbiz_app_dev'),
+    appUser: env('DB_APP_USER', 'drapsystems_app'),
+    appPassword: env('DB_APP_PASSWORD', 'drapsystems_app_dev'),
     /** Usuario administrador (solo para crear la base y aplicar migraciones). */
     adminUser: env('DB_ADMIN_USER', 'postgres'),
     adminPassword: process.env.DB_ADMIN_PASSWORD ?? '',

@@ -98,7 +98,7 @@
     "delete_only_empty": "A closed lot cannot be deleted. Reopen it first if you need to delete it.",
     "import": {
       "title": "Import equipment",
-      "subtitle": "Load many units at once from a CSV file (for example, an Excel inventory saved as CSV). They become available right away, without going through testing, inside a new lot.",
+      "subtitle": "Load many units at once from a CSV file (for example, an Excel inventory saved as CSV), inside a new lot. By default they become available right away, without going through testing; you can also ask for them to go through testing to verify them against the file (see step 2).",
       "step1": "1. File",
       "step2": "2. Columns",
       "step3": "3. Preview",
@@ -122,7 +122,11 @@
       "summary": "{{created}} of {{total}} unit(s) will be created · {{skipped}} will be skipped",
       "new_values": "{{n}} new value(s) will be added to the catalogs",
       "commit_action": "Confirm import",
-      "done": "{{n}} unit(s) imported"
+      "done": "{{n}} unit(s) imported",
+      "verify_on_test": "Send to testing to verify by serial number",
+      "verify_on_test_hint": "Each unit goes to testing (instead of becoming available right away). Typing its serial number in testing automatically loads the data the file had for it, so you can check whether it matches the physical unit; if it doesn't, fix it right there. The lot and unit reports let you see afterward which ones arrived exactly as the file said and which didn't.",
+      "verify_on_test_needs_serial": "To verify, first pick which file column has the serial number.",
+      "verify_on_test_summary": "The units were left in testing, not available: typing their serial number there loads the file's data for review."
     },
     "importTech": {
       "title": "Import units (technical control)",

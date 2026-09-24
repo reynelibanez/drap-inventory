@@ -174,6 +174,82 @@ describe('/api/imports: inspeccionar, previsualizar y confirmar', () => {
   });
 });
 
+describe('/api/imports con verifyOnTest: los equipos entran a testeo y se guarda lo declarado', () => {
+  it('crea el lote con requiresTesting y los equipos quedan en testeo (no disponibles), con una foto de lo declarado', async () => {
+    const csv = [HEADER, 'REFV,LEE,SNVERIFY1,HP,15-BA009DX,I5-1005G1,8GB,256GB SSD,"15.6""",WIN 10 PRO,GOOD,65-90W,,,'].join('\n');
+    const r = await api.call('POST', '/api/imports/commit', tokA, {
+      equipmentTypeId: laptopTypeId, csv, mapping: mappingFor(), lotReference: 'Prueba verificación', verifyOnTest: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.created).toBe(1);
+
+    const lot = await api.call('GET', `/api/lots/${r.body.lotId}`, tokA);
+    expect(lot.body.requiresTesting).toBe(true);
+    expect(lot.body.statusKey).toBe('counted');
+
+    const u1 = await api.call('GET', `/api/units?lotId=${r.body.lotId}&pageSize=20`, tokA);
+    const unit = u1.body.items.find((u: any) => u.serialNumber === 'SNVERIFY1');
+    expect(unit.statusKey).toBe('testing');
+    expect(unit.testedAt).toBeFalsy();
+    // Los datos ya vienen cargados desde la importación: se pueden revisar y terminar el testeo directamente.
+    expect(unit.specs.ram).toBeTruthy();
+
+    // Al terminar el testeo SIN cambiar nada, el reporte debe marcarlo como "llegó igual a lo declarado".
+    const finished = await api.call('POST', `/api/units/${unit.id}/finish-test`, tokA, {
+      cosmeticGradeId: m.item('cosmetic_grade', 'A'),
+      functionalGradeId: m.item('functional_grade', 'A'),
+    });
+    expect(finished.status).toBe(200);
+
+    const preview = await api.call('POST', '/api/reports/preview', tokA, {
+      dataset: 'units',
+      definition: { mode: 'detail', columns: [{ field: 'serial' }, { field: 'hasImportSnapshot' }, { field: 'matchesImportDeclared' }], filters: [{ field: 'code', op: 'eq', a: unit.code }], sort: [] },
+    });
+    expect(preview.status).toBe(200);
+    const row = preview.body.rows[0];
+    expect(row[1]).toBe(true);
+    expect(row[2]).toBe(true);
+
+    // El reporte de lotes también debe contarlo como verificado y como coincidente.
+    const lotPreview = await api.call('POST', '/api/reports/preview', tokA, {
+      dataset: 'lots',
+      definition: { mode: 'detail', columns: [{ field: 'importVerified' }, { field: 'importMatched' }, { field: 'importDiffering' }], filters: [{ field: 'code', op: 'eq', a: lot.body.code }], sort: [] },
+    });
+    expect(lotPreview.body.rows[0]).toEqual([1, 1, 0]);
+  });
+
+  it('si el técnico corrige un dato al testear, el reporte lo marca como diferente a lo declarado', async () => {
+    const csv = [HEADER, 'REFV2,LEE,SNVERIFY2,HP,15-BA009DX,I5-1005G1,8GB,256GB SSD,"15.6""",WIN 10 PRO,GOOD,65-90W,,,'].join('\n');
+    const r = await api.call('POST', '/api/imports/commit', tokA, {
+      equipmentTypeId: laptopTypeId, csv, mapping: mappingFor(), lotReference: 'Prueba verificación 2', verifyOnTest: true,
+    });
+    const u1 = await api.call('GET', `/api/units?lotId=${r.body.lotId}&pageSize=20`, tokA);
+    const unit = u1.body.items.find((u: any) => u.serialNumber === 'SNVERIFY2');
+
+    // El técnico revisa el equipo físico y corrige el serial (venía mal escrito en el archivo).
+    await api.call('POST', `/api/units/${unit.id}/finish-test`, tokA, {
+      cosmeticGradeId: m.item('cosmetic_grade', 'A'),
+      functionalGradeId: m.item('functional_grade', 'A'),
+      serialNumber: 'SNVERIFY2-CORREGIDO',
+    });
+
+    const preview = await api.call('POST', '/api/reports/preview', tokA, {
+      dataset: 'units',
+      definition: { mode: 'detail', columns: [{ field: 'serial' }, { field: 'matchesImportDeclared' }], filters: [{ field: 'code', op: 'eq', a: unit.code }], sort: [] },
+    });
+    expect(preview.body.rows[0]).toEqual(['SNVERIFY2-CORREGIDO', false]);
+  });
+
+  it('sin verifyOnTest (por defecto) el lote sigue sin requerir testeo, como antes', async () => {
+    const csv = [HEADER, 'REFV3,LEE,SNNOVERIFY,HP,15-BA009DX,I5-1005G1,8GB,256GB SSD,"15.6""",WIN 10 PRO,GOOD,65-90W,,,'].join('\n');
+    const r = await api.call('POST', '/api/imports/commit', tokA, { equipmentTypeId: laptopTypeId, csv, mapping: mappingFor(), lotReference: 'Prueba sin verificación' });
+    const lot = await api.call('GET', `/api/lots/${r.body.lotId}`, tokA);
+    expect(lot.body.requiresTesting).toBe(false);
+    const u1 = await api.call('GET', `/api/units?lotId=${r.body.lotId}&pageSize=20`, tokA);
+    expect(u1.body.items.find((u: any) => u.serialNumber === 'SNNOVERIFY').statusKey).toBe('available');
+  });
+});
+
 describe('permiso "Importar equipos desde un archivo CSV" en empresas que ya existían', () => {
   it('un rol que administra usuarios pero al que le falta el permiso lo recibe una sola vez, sin duplicar ni tocar otros roles', async () => {
     const co = await makeCompany('Import Perm SA', 'adminImportPerm');

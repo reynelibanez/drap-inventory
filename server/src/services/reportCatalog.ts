@@ -59,8 +59,12 @@ const UNIT_STATS = `LEFT JOIN LATERAL (
          count(*) FILTER (WHERE s.system_key = 'available') AS available,
          count(*) FILTER (WHERE s.system_key = 'reserved') AS reserved,
          count(*) FILTER (WHERE s.system_key = 'sold') AS sold,
-         count(*) FILTER (WHERE s.system_key = 'not_sellable') AS not_sellable
-    FROM units x JOIN catalog_items s ON s.id = x.status_id WHERE x.lot_id = lo.id) us ON true`;
+         count(*) FILTER (WHERE s.system_key = 'not_sellable') AS not_sellable,
+         count(*) FILTER (WHERE im.unit_id IS NOT NULL) AS import_verified,
+         count(*) FILTER (WHERE im.unit_id IS NOT NULL AND lower(coalesce(x.serial_number, '')) = lower(coalesce(im.serial_number, '')) AND x.specs = im.specs) AS import_matched
+    FROM units x JOIN catalog_items s ON s.id = x.status_id
+    LEFT JOIN unit_import_snapshots im ON im.unit_id = x.id
+   WHERE x.lot_id = lo.id) us ON true`;
 
 const LOCATION_CHAIN: Join[] = [
   { alias: 'sl', sql: 'LEFT JOIN slots sl ON sl.id = u.slot_id' },
@@ -96,6 +100,7 @@ export const DATASETS: Dataset[] = [
       { alias: 'sos', sql: 'LEFT JOIN catalog_items sos ON sos.id = so.status_id', deps: ['so'] },
       { alias: 'cu', sql: 'LEFT JOIN customers cu ON cu.id = so.customer_id', deps: ['so'] },
       { alias: 'se', sql: 'LEFT JOIN sellers se ON se.id = so.seller_id', deps: ['so'] },
+      { alias: 'imp', sql: 'LEFT JOIN unit_import_snapshots imp ON imp.unit_id = u.id' },
     ],
     fields: [
       f('unit', 'code', 'Código', 'Code', 'text', 'u.code'),
@@ -111,6 +116,9 @@ export const DATASETS: Dataset[] = [
       f('lot', 'lotCode', 'Lote', 'Lot', 'text', 'lo.code', { join: 'lo' }),
       f('lot', 'lotDate', 'Fecha de compra del lote', 'Lot purchase date', 'date', 'lo.purchase_date', { join: 'lo' }),
       f('lot', 'supplier', 'Proveedor', 'Supplier', 'text', 'sp.name', { join: 'sp', perm: 'suppliers.view' }),
+      f('lot', 'hasImportSnapshot', 'Viene de una importación con verificación', 'From an import with verification', 'boolean', '(imp.unit_id IS NOT NULL)', { join: 'imp' }),
+      f('lot', 'matchesImportDeclared', 'Llegó igual a lo declarado en la importación', 'Arrived as declared in the import', 'boolean',
+        `(CASE WHEN imp.unit_id IS NOT NULL THEN (lower(coalesce(u.serial_number, '')) = lower(coalesce(imp.serial_number, '')) AND u.specs = imp.specs) END)`, { join: 'imp' }),
       f('location', 'placed', 'Está ubicado', 'Is placed', 'boolean', '(u.slot_id IS NOT NULL)'),
       f('location', 'warehouse', 'Almacén', 'Warehouse', 'select', 'wh.name', { idSql: 'wh.id', join: 'wh', options: 'warehouses' }),
       f('location', 'area', 'Área', 'Area', 'text', 'ar.name', { join: 'ar' }),
@@ -166,6 +174,9 @@ export const DATASETS: Dataset[] = [
       f('stats', 'reserved', 'Reservados', 'Reserved', 'number', 'us.reserved', { join: 'us' }),
       f('stats', 'sold', 'Vendidos', 'Sold', 'number', 'us.sold', { join: 'us' }),
       f('stats', 'notSellable', 'No vendibles', 'Not sellable', 'number', 'us.not_sellable', { join: 'us' }),
+      f('stats', 'importVerified', 'Con verificación de importación', 'With import verification', 'number', 'us.import_verified', { join: 'us' }),
+      f('stats', 'importMatched', 'Llegaron igual a lo declarado', 'Arrived as declared', 'number', 'us.import_matched', { join: 'us' }),
+      f('stats', 'importDiffering', 'Con diferencias frente a lo declarado', 'Differing from declared', 'number', '(us.import_verified - us.import_matched)', { join: 'us' }),
     ],
   },
 

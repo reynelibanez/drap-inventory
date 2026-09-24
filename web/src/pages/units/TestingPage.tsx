@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, Copy, History, ListChecks, Pencil, Plus, Printer, Trash2 } from 'lucide-react';
+import { CheckCircle2, Copy, History, ListChecks, Pencil, Plus, Printer, ScanLine, Trash2 } from 'lucide-react';
 import { api, ApiError, qs } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useMeta } from '../../lib/meta';
-import { Badge, Button, Card, Checkbox, Empty, Field, Modal, PageHeader, Progress, Select, Spinner, Tabs, Textarea, useConfirm, useErr, useToast } from '../../components/ui';
+import { Badge, Button, Card, Checkbox, Empty, Field, Input, Modal, PageHeader, Progress, Select, Spinner, Tabs, Textarea, useConfirm, useErr, useToast } from '../../components/ui';
 import { DataGrid, type GridColumn } from '../../components/grid/DataGrid';
 import { useUnitColumns, type UnitRow } from '../../components/UnitGrid';
 import { useAllRows } from '../../lib/useAllRows';
@@ -45,6 +45,7 @@ export default function TestingPage() {
   const labelCtx = useLabelCtx();
   const [mineOnly, setMineOnly] = useState(false);
   const [view, setView] = useState<View>('all');
+  const [serialLookup, setSerialLookup] = useState('');
   const mobile = useIsMobile();
 
   const lots = useQuery({
@@ -121,6 +122,25 @@ export default function TestingPage() {
     setPanel({ kind: 'unit', id: u.id });
     setTimeout(() => document.getElementById('test-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
   };
+
+  /**
+   * Busca por número de serie dentro del lote elegido. Si el equipo ya existe (por ejemplo, viene de una
+   * importación con verificación) lo abre con todos sus datos ya cargados, para revisar si coinciden con el
+   * equipo físico. Si no existe, abre un registro nuevo con esa serie ya puesta.
+   */
+  function findBySerial() {
+    const serial = serialLookup.trim();
+    if (!serial || !lotId) return;
+    const match = allItems.find((u) => u.serialNumber && u.serialNumber.toLowerCase() === serial.toLowerCase());
+    if (match) {
+      if (!canOpen(match)) { toast.error(t('testing.serial_no_access', { code: match.code })); return; }
+      openUnit(match);
+    } else {
+      openDraft({ ...emptyDraft(defaultLot), serial }, t('testing.new_title'));
+      toast.info(t('testing.serial_not_found', { serial }));
+    }
+    setSerialLookup('');
+  }
 
   /** Al terminar el testeo imprime la etiqueta asociada al tipo de cada equipo (si está activado). */
   const autoPrintUnits = (ids: number[]) => {
@@ -216,6 +236,19 @@ export default function TestingPage() {
           {lotId && <Link to={`/lots/${lotId}`}>{t('testing.open_lot')}</Link>}
         </div>
         {testable.length === 0 && <div className="alert alert-info" style={{ marginTop: 12 }}>{t('testing.no_lots')}</div>}
+        {lotId && (
+          <div className="row wrap" style={{ marginTop: 12 }}>
+            <Field label={t('testing.search_serial')} hint={t('testing.search_serial_hint')} className="grow">
+              <div className="row gap-sm">
+                <Input className="big-input" value={serialLookup} autoComplete="off" spellCheck={false}
+                  placeholder={t('testing.serial_hint')}
+                  onChange={(e) => setSerialLookup(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); findBySerial(); } }} />
+                <Button icon={<ScanLine size={16} />} disabled={!serialLookup.trim()} onClick={findBySerial}>{t('testing.search_serial_action')}</Button>
+              </div>
+            </Field>
+          </div>
+        )}
       </Card>
 
       {panel && (mobile ? (

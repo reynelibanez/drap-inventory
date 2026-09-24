@@ -360,18 +360,25 @@ export function countFilledMappedCells(mapping: ImportMapping, row: string[]): n
 }
 
 /**
- * Ejecuta toda la importación: crea el lote contenedor y da de alta un equipo por fila (directo como "disponible",
- * sin testeo, igual que la venta de un lote completo). Cada fila corre en su propio SAVEPOINT: si una fila falla
- * (dato inválido, serie repetida...) se revierte solo esa fila y se sigue con las demás, sin perder el resto de la
- * importación.
+ * Ejecuta toda la importación: crea el lote contenedor y da de alta un equipo por fila. Cada fila corre en su
+ * propio SAVEPOINT: si una fila falla (dato inválido, serie repetida...) se revierte solo esa fila y se sigue
+ * con las demás, sin perder el resto de la importación.
+ *
+ * `verifyOnTest`: por defecto los equipos quedan directo como "disponibles" (sin testeo), igual que la venta de
+ * un lote completo. Si se activa, en cambio, cada equipo entra a testeo (igual que un lote normal) y se guarda
+ * una foto de lo que decía el archivo (serie y datos técnicos) en `unit_import_snapshots`, para poder comparar
+ * después contra lo que el técnico confirme al terminar el testeo (ver los campos de reporte "Verificación de
+ * importación" del conjunto de datos "Equipos" y "Lotes").
  */
 export async function performImport(c: Ctx, opts: {
   equipmentTypeId: number; headers: string[]; dataRows: string[][]; mapping: ImportMapping; lotReference: string | null;
+  verifyOnTest?: boolean;
 }): Promise<ImportOutcome> {
   const type = await c.db.opt<{ is_active: boolean }>('SELECT is_active FROM equipment_types WHERE id = $1', [opts.equipmentTypeId]);
   if (!type || !type.is_active) throw badRequest('invalid_equipment_type');
   const attrs = await loadTypeAttrs(c.db, opts.equipmentTypeId);
   const resolver = new Resolver(c.db, c.companyId);
+  const verifyOnTest = opts.verifyOnTest ?? false;
 
   const settings = await getSettings(c.db, c.companyId);
   const today = new Date();
@@ -380,8 +387,8 @@ export async function performImport(c: Ctx, opts: {
   const company = await c.db.one<{ currency: string }>('SELECT currency FROM companies WHERE id = $1', [c.companyId]);
   const lot = await c.db.one<{ id: number }>(
     `INSERT INTO lots (company_id, code, status_id, purchase_date, reference, currency, requires_testing, counted_at, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,false,now(),$7) RETURNING id`,
-    [c.companyId, lotCode, lotStatus, today.toISOString().slice(0, 10), opts.lotReference, company.currency, c.userId]);
+     VALUES ($1,$2,$3,$4,$5,$6,$7,now(),$8) RETURNING id`,
+    [c.companyId, lotCode, lotStatus, today.toISOString().slice(0, 10), opts.lotReference, company.currency, verifyOnTest, c.userId]);
 
   const results: ImportRowResult[] = [];
   let created = 0;
@@ -404,8 +411,13 @@ export async function performImport(c: Ctx, opts: {
         if (dup) throw new AppError(409, 'serial_duplicate', { code: dup.code });
       }
       const u = await insertUnit(c, {
-        lotId: lot.id, lotCode, lineId: null, equipmentTypeId: opts.equipmentTypeId, specs: normSpecs, serial, notes, available: true,
+        lotId: lot.id, lotCode, lineId: null, equipmentTypeId: opts.equipmentTypeId, specs: normSpecs, serial, notes, available: !verifyOnTest,
       });
+      if (verifyOnTest) {
+        await c.db.query(
+          `INSERT INTO unit_import_snapshots (company_id, unit_id, lot_id, serial_number, specs, notes) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [c.companyId, u.id, lot.id, serial, JSON.stringify(normSpecs), notes]);
+      }
       await c.db.query('RELEASE SAVEPOINT import_row');
       created++;
       results.push({ rowIndex: i, ok: true, unitCode: u.code, serial, specs: normSpecs, notes });
@@ -416,6 +428,6 @@ export async function performImport(c: Ctx, opts: {
     }
   }
 
-  await c.audit('lot.imported', 'lot', lot.id, { code: lotCode, equipmentTypeId: opts.equipmentTypeId, created, skipped: results.length - created });
+  await c.audit('lot.imported', 'lot', lot.id, { code: lotCode, equipmentTypeId: opts.equipmentTypeId, created, skipped: results.length - created, verifyOnTest });
   return { lotId: lot.id, lotCode, created, skipped: results.length - created, results, newCatalogItems: resolver.created };
 }
